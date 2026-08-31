@@ -12,6 +12,7 @@ import { bayesLab } from "./bayes.js";
 import { certaintyLab } from "./certainty.js";
 import { fuzzyLab } from "./fuzzy.js";
 import { expertLab } from "./expert.js";
+import { knowledgeLab } from "./knowledge.js";
 import { mlLab } from "./ml.js";
 import { nlpLab } from "./nlp.js";
 import { neuralLab } from "./neural.js";
@@ -51,6 +52,7 @@ export const LABS: Lab[] = [
   expertLab,
   mlLab,
   nlpLab,
+  knowledgeLab,
 ];
 
 /** Seluruh sesi silabus, termasuk yang belum terimplementasi. */
@@ -61,7 +63,7 @@ export const SYLLABUS: { session: number; title: Bilingual; slug?: string }[] = 
   { session: 4, title: bayesLab.title, slug: bayesLab.slug },
   { session: 5, title: bi("Logika Fuzzy I", "Fuzzy Logic I"), slug: fuzzyLab.slug },
   { session: 6, title: bi("Logika Fuzzy II", "Fuzzy Logic II"), slug: fuzzyLab.slug },
-  { session: 7, title: bi("Representasi Pengetahuan", "Knowledge Representation") },
+  { session: 7, title: knowledgeLab.title, slug: knowledgeLab.slug },
   { session: 8, title: searchLab.title, slug: searchLab.slug },
   { session: 9, title: neuralLab.title, slug: neuralLab.slug },
   { session: 10, title: nlpLab.title, slug: nlpLab.slug },

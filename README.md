@@ -85,7 +85,7 @@ Penggolongan ini menentukan bentuk harness Go dan PL/SQL nanti. Tanpa itu, selur
 | 04 | Probabilitas Bayesian | **Teorema Bayes**, Naive Bayes, diagram 1.000 kasus | ✅ |
 | 05 | Logika Fuzzy I | **Enam bentuk fungsi keanggotaan**, operasi Zadeh & produk, potongan alfa | ✅ |
 | 06 | Logika Fuzzy II | **Mamdani, Sugeno, Tsukamoto** berdampingan, 5 metode defuzzifikasi | ✅ |
-| 07 | Representasi Pengetahuan | Logika proposisi, resolusi, jaringan semantik, bingkai | ⏳ |
+| 07 | Representasi Pengetahuan | **Pengurai rumus**, tabel kebenaran, CNF, **pembuktian resolusi**, jaringan semantik, bingkai | ✅ |
 | 08 | Teknik Pencarian | **Sembilan algoritma** diadu di satu peta: BFS, DFS, DLS, IDDFS, UCS, Greedy, **A\***, hill climbing, annealing | ✅ |
 | 09 | Jaringan Syaraf Tiruan | Perceptron, **backpropagation** yang diverifikasi gradien numerik, batas keputusan & kurva galat langsung | ✅ |
 | 10 | Pemrosesan Bahasa Alami | **Stemmer Nazief-Adriani** Bahasa Indonesia, TF-IDF, kemiripan kosinus, jarak sunting, sentimen berpengingkaran | ✅ |
@@ -152,12 +152,13 @@ Setiap fungsi publik punya uji. Bukan uji jalur bahagia saja — uji nilai batas
 | `expert.rs` | 26 | 30 |
 | `ml.rs` | 30 | 50 |
 | `nlp.rs` | 22 | 43 |
+| `knowledge.rs` | 28 | 42 |
 | `fx.rs` | 8 | 17 |
 | `rng.rs` | 9 | 16 |
 | `lib.rs` | 2 | 4 |
-| `ai-wasm/lib.rs` | 40 | 54 |
+| `ai-wasm/lib.rs` | 44 | 60 |
 | `web/src/ui.ts` | 11 | 15 |
-| **Total** | **250** | **437** |
+| **Total** | **282** | **485** |
 
 Beberapa uji yang menahan seluruh proyek ini tetap jujur:
 
@@ -209,6 +210,7 @@ ai-atlas/
 │   │       ├── search.rs      Sesi 8 — Teknik Pencarian
 │   │       ├── neural.rs      Sesi 9 — Jaringan Syaraf Tiruan
 │   │       ├── expert.rs      Sesi 11 — Sistem Pakar
+│   │       ├── knowledge.rs   Sesi 7 — Representasi Pengetahuan
 │   │       ├── nlp.rs         Sesi 10 — Pemrosesan Bahasa Alami
 │   │       ├── ml.rs          Sesi 12-13 — Sains Data & Machine Learning
 │   │       ├── fx.rs          Pertukaran pecahan bit-eksak

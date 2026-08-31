@@ -22,6 +22,7 @@
 //! | 3 | Ketidakpastian | [`certainty`] |
 //! | 4 | Probabilitas Bayesian | [`bayes`] |
 //! | 5-6 | Logika Fuzzy | [`fuzzy`] |
+//! | 7 | Representasi Pengetahuan | [`knowledge`] |
 //! | 8 | Teknik Pencarian | [`search`] |
 //! | 9 | Jaringan Syaraf Tiruan | [`neural`] |
 //! | 11 | Sistem Pakar | [`expert`] |
@@ -39,6 +40,7 @@ pub mod certainty;
 pub mod expert;
 pub mod fuzzy;
 pub mod fx;
+pub mod knowledge;
 pub mod ml;
 pub mod neural;
 pub mod nlp;
@@ -86,6 +88,12 @@ pub const SESSIONS: &[SessionInfo] = &[
         module: "fuzzy",
         title_id: "Logika Fuzzy II",
         title_en: "Fuzzy Logic II",
+    },
+    SessionInfo {
+        session: 7,
+        module: "knowledge",
+        title_id: "Representasi Pengetahuan",
+        title_en: "Knowledge Representation",
     },
     SessionInfo {
         session: 8,

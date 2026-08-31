@@ -1185,6 +1185,142 @@ pub fn nlp_sentiment(text: &str) -> String {
     ok(ai_core::nlp::sentiment_id(&ai_core::nlp::tokenize(text)))
 }
 
+// ---------------------------------------------------------------------------
+// Sesi 7 — Representasi Pengetahuan
+// ---------------------------------------------------------------------------
+
+/// Menguraikan rumus proposisi lalu menyusun tabel kebenarannya.
+#[wasm_bindgen]
+pub fn logic_truth_table(formula: &str) -> String {
+    let parsed = match ai_core::knowledge::parse(formula) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    match ai_core::knowledge::truth_table(&parsed) {
+        Ok(table) => {
+            #[derive(Serialize)]
+            struct Out {
+                text: String,
+                variables: Vec<String>,
+                rows: Vec<ai_core::knowledge::TruthRow>,
+                tautology: bool,
+                satisfiable: bool,
+                contradiction: bool,
+                cnf: Vec<String>,
+            }
+            let cnf = ai_core::knowledge::to_cnf(&parsed)
+                .iter()
+                .map(ai_core::knowledge::clause_text)
+                .collect();
+            ok(Out {
+                text: parsed.to_text(),
+                variables: table.variables,
+                rows: table.rows,
+                tautology: table.tautology,
+                satisfiable: table.satisfiable,
+                contradiction: table.contradiction,
+                cnf,
+            })
+        }
+        Err(e) => err(e),
+    }
+}
+
+/// Memeriksa apakah dua rumus setara secara logika.
+#[wasm_bindgen]
+pub fn logic_equivalent(a: &str, b: &str) -> String {
+    let left = match ai_core::knowledge::parse(a) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let right = match ai_core::knowledge::parse(b) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    match ai_core::knowledge::equivalent(&left, &right) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+/// Membuktikan sebuah kesimpulan dari basis pengetahuan dengan resolusi.
+///
+/// `knowledge_json` berbentuk larik teks rumus, mis. `["P -> Q","P"]`.
+#[wasm_bindgen]
+pub fn logic_resolve(knowledge_json: &str, conclusion: &str) -> String {
+    let texts: Vec<String> = match serde_json::from_str(knowledge_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let mut formulas = Vec::with_capacity(texts.len());
+    for t in &texts {
+        match ai_core::knowledge::parse(t) {
+            Ok(f) => formulas.push(f),
+            Err(e) => return err(e),
+        }
+    }
+    let target = match ai_core::knowledge::parse(conclusion) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    match ai_core::knowledge::resolve(&formulas, &target) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+/// Jaringan semantik contoh beserta sifat warisan tiap simpulnya.
+#[wasm_bindgen]
+pub fn logic_semantic_network(node: &str) -> String {
+    let mut network = ai_core::knowledge::SemanticNetwork::new();
+    for (from, label, to) in [
+        ("hewan", "punya", "sel"),
+        ("burung", "adalah", "hewan"),
+        ("burung", "punya", "sayap"),
+        ("burung", "bisa", "terbang"),
+        ("pinguin", "adalah", "burung"),
+        ("pinguin", "bisa", "berenang"),
+        ("pinguin", "tinggal di", "kutub"),
+        ("elang", "adalah", "burung"),
+        ("elang", "punya", "cakar"),
+    ] {
+        network.add(from, label, to);
+    }
+
+    #[derive(Serialize)]
+    struct Out {
+        relations: Vec<ai_core::knowledge::Relation>,
+        nodes: Vec<String>,
+        selected: String,
+        properties: Vec<ai_core::knowledge::Relation>,
+        ancestors: Vec<String>,
+    }
+
+    let nodes = network.nodes();
+    let selected = if nodes.iter().any(|n| n == node) {
+        node.to_string()
+    } else {
+        "pinguin".to_string()
+    };
+    let properties = match network.properties_of(&selected) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let ancestors = nodes
+        .iter()
+        .filter(|n| **n != selected && network.is_a(&selected, n))
+        .cloned()
+        .collect();
+
+    ok(Out {
+        relations: network.relations.clone(),
+        nodes,
+        selected,
+        properties,
+        ancestors,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1808,5 +1944,69 @@ mod tests {
         // Pengingkaran harus membalik hasilnya.
         let out = nlp_sentiment("makanannya tidak bagus");
         assert!(out.contains(r#""label":"negatif""#), "{out}");
+    }
+
+    #[test]
+    fn tabel_kebenaran_lewat_jembatan() {
+        let out = logic_truth_table("P -> Q");
+        assert!(!out.contains(r#""err""#), "{out}");
+        assert!(out.contains(r#""tautology":false"#), "{out}");
+        assert!(out.contains("cnf"));
+
+        let tautologi = logic_truth_table("P | ~P");
+        assert!(tautologi.contains(r#""tautology":true"#), "{tautologi}");
+
+        let kontradiksi = logic_truth_table("P & ~P");
+        assert!(
+            kontradiksi.contains(r#""contradiction":true"#),
+            "{kontradiksi}"
+        );
+    }
+
+    #[test]
+    fn tabel_kebenaran_menolak_rumus_rusak() {
+        assert!(logic_truth_table("P &").contains("err"));
+        assert!(logic_truth_table("").contains("err"));
+        assert!(logic_truth_table("P @ Q").contains("err"));
+    }
+
+    #[test]
+    fn kesetaraan_lewat_jembatan() {
+        assert!(logic_equivalent("~(P & Q)", "~P | ~Q").contains(r#""ok":true"#));
+        assert!(logic_equivalent("P -> Q", "Q -> P").contains(r#""ok":false"#));
+        assert!(logic_equivalent("P &", "Q").contains("err"));
+        assert!(logic_equivalent("P", "Q &").contains("err"));
+    }
+
+    #[test]
+    fn resolusi_lewat_jembatan() {
+        let out = logic_resolve(r#"["P -> Q","P"]"#, "Q");
+        assert!(out.contains(r#""proved":true"#), "{out}");
+        assert!(out.contains("initial_clauses"));
+        assert!(out.contains("steps"));
+
+        let gagal = logic_resolve(r#"["P -> Q","Q"]"#, "P");
+        assert!(gagal.contains(r#""proved":false"#), "{gagal}");
+    }
+
+    #[test]
+    fn resolusi_menolak_masukan_salah() {
+        assert!(logic_resolve("bukan", "Q").contains("err"));
+        assert!(logic_resolve("[]", "Q").contains("err"));
+        assert!(logic_resolve(r#"["P &"]"#, "Q").contains("err"));
+        assert!(logic_resolve(r#"["P"]"#, "Q &").contains("err"));
+    }
+
+    #[test]
+    fn jaringan_semantik_lewat_jembatan() {
+        let out = logic_semantic_network("pinguin");
+        assert!(!out.contains(r#""err""#), "{out}");
+        assert!(out.contains("sayap"), "sifat warisan hilang: {out}");
+        assert!(out.contains("sel"), "sifat kakek hilang: {out}");
+        assert!(out.contains(r#""selected":"pinguin""#));
+
+        // Simpul yang tidak ada jatuh ke simpul bawaan, bukan menjadi galat.
+        let cadangan = logic_semantic_network("naga");
+        assert!(cadangan.contains(r#""selected":"pinguin""#), "{cadangan}");
     }
 }

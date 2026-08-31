@@ -925,3 +925,79 @@ export function nlpNgrams(text: string, n: number): string[] {
 export function nlpSentiment(text: string): Sentiment {
   return unwrap<Sentiment>(wasm.nlp_sentiment(text));
 }
+
+// ---------------------------------------------------------------------------
+// Sesi 7 — Representasi Pengetahuan
+// ---------------------------------------------------------------------------
+
+/** Satu baris tabel kebenaran. */
+export interface TruthRow {
+  values: boolean[];
+  result: boolean;
+}
+
+/** Tabel kebenaran lengkap beserta bentuk normal konjungtifnya. */
+export interface TruthTable {
+  text: string;
+  variables: string[];
+  rows: TruthRow[];
+  tautology: boolean;
+  satisfiable: boolean;
+  contradiction: boolean;
+  cnf: string[];
+}
+
+/** Satu langkah resolusi. */
+export interface ResolutionStep {
+  order: number;
+  left: string;
+  right: string;
+  pivot: string;
+  result: string;
+}
+
+/** Hasil pembuktian dengan resolusi. */
+export interface ResolutionProof {
+  proved: boolean;
+  initial_clauses: string[];
+  steps: ResolutionStep[];
+  generated: number;
+}
+
+/** Sebuah relasi berarah pada jaringan semantik. */
+export interface Relation {
+  from: string;
+  label: string;
+  to: string;
+}
+
+/** Jaringan semantik beserta sifat warisan simpul terpilih. */
+export interface SemanticNetworkView {
+  relations: Relation[];
+  nodes: string[];
+  selected: string;
+  properties: Relation[];
+  ancestors: string[];
+}
+
+/** Tabel kebenaran sebuah rumus proposisi. */
+export function logicTruthTable(formula: string): TruthTable {
+  return unwrap<TruthTable>(wasm.logic_truth_table(formula));
+}
+
+/** Apakah dua rumus setara secara logika. */
+export function logicEquivalent(a: string, b: string): boolean {
+  return unwrap<boolean>(wasm.logic_equivalent(a, b));
+}
+
+/** Membuktikan kesimpulan dari basis pengetahuan dengan resolusi. */
+export function logicResolve(knowledge: string[], conclusion: string): ResolutionProof {
+  return unwrap<ResolutionProof>(
+    wasm.logic_resolve(JSON.stringify(knowledge), conclusion),
+  );
+}
+
+/** Jaringan semantik contoh beserta sifat warisan sebuah simpul. */
+export function logicSemanticNetwork(node: string): SemanticNetworkView {
+  return unwrap<SemanticNetworkView>(wasm.logic_semantic_network(node));
+}
