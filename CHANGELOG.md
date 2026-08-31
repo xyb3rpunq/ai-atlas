@@ -27,6 +27,15 @@ penomoran mengikuti [Semantic Versioning](https://semver.org/lang/id/).
   situs, `robots.txt`, data terstruktur `LearningResource`, dan halaman 404.
 
 ### Diperbaiki
+- **Uji divergensi jaringan lolos di Windows tetapi gagal di Linux.** Bukan
+  flake. IEEE-754 hanya mewajibkan `+ - x / sqrt` dan perbandingan dibulatkan
+  dengan benar; `exp`, `ln`, dan `tanh` tidak, sehingga pustaka matematika yang
+  berbeda boleh meleset satu ULP. Pada pelatihan berlangkah besar yang sudah
+  berayun, selisih itu membesar menjadi hasil yang sama sekali berbeda. Uji
+  diganti menjadi langkah yang jauh lebih ekstrem, tempat aktivasinya jenuh
+  sepenuhnya, ditambah uji pembanding relatif yang tidak goyah oleh pembulatan.
+  Penggolong `Comparability` ditambahkan ke `fx` untuk menetapkan sejak awal
+  perhitungan mana yang boleh dituntut identik bit demi bit dan mana yang tidak.
 - **Jaringan hasil deserialisasi langsung meledak saat dilatih.** Kecepatan
   momentum tidak ikut diserialisasi, sehingga jaringan yang dibaca kembali dari
   JSON datang dengan penyangga kosong dan pembaruan bobot mengindeks di luar

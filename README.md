@@ -61,6 +61,20 @@ Saat membangun harness ini, pengukuran menemukan bahwa `serde_json::from_str::<f
 
 Karena itu seluruh vektor uji lintas bahasa memakai **16 digit heksadesimal pola bit**, bukan desimal. Lihat [`crates/ai-core/src/fx.rs`](crates/ai-core/src/fx.rs) dan uji `serde_json_bisa_meleset_satu_ulp` yang memagari temuan ini.
 
+### Catatan teknis: apa yang sebenarnya bisa dibandingkan
+
+Temuan kedua, dari CI: sebuah uji jaringan syaraf **lolos di Windows dan gagal di Linux**. Bukan flake, dan bukan bug di kodenya. IEEE-754 hanya mewajibkan enam operasi dibulatkan dengan benar — `+`, `−`, `×`, `÷`, `√`, dan perbandingan. Fungsi transendental seperti `exp`, `ln`, `tanh`, `sin`, dan `pow` **tidak diwajibkan**, sehingga pustaka matematika yang berbeda boleh menghasilkan nilai berbeda satu ULP untuk masukan yang sama. Pada pelatihan berlangkah besar yang sudah berayun, selisih sekecil itu membesar menjadi hasil akhir yang sama sekali berbeda.
+
+Menuntut kesamaan bit pada perhitungan seperti itu akan menghasilkan uji yang gagal berselang-seling tanpa ada yang benar-benar salah. Karena itu tiap perhitungan digolongkan lebih dulu:
+
+| Tingkat | Berlaku untuk | Yang dituntut |
+|---|---|---|
+| `BitExact` | Hanya `+ − × ÷ √` dan perbandingan | Identik bit demi bit |
+| `NearlyEqual(n)` | Menyentuh `exp`, `ln`, `tanh`, `pow` | Selisih maksimal `n` ULP (bawaan 4) |
+| `PropertyOnly` | Perhitungan kacau, mis. pelatihan divergen | Hanya sifatnya, mis. "yang wajar lebih baik daripada yang ekstrem" |
+
+Penggolongan ini menentukan bentuk harness Go dan PL/SQL nanti. Tanpa itu, seluruh perbandingan tiga arah akan dibangun di atas asumsi yang salah.
+
 ## Peta silabus
 
 | Sesi | Topik | Yang bisa Anda mainkan | Status |

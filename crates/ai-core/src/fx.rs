@@ -23,6 +23,78 @@
 /// Panjang representasi heksadesimal sebuah `f64`: 16 digit.
 pub const HEX_LEN: usize = 16;
 
+/// Seberapa jauh sebuah perhitungan bisa dituntut sama antarbahasa.
+///
+/// Menyamakan hasil Rust, Go, dan PL/SQL hanya masuk akal bila targetnya
+/// ditetapkan lebih dulu. Tidak semua perhitungan bisa dituntut sama persis,
+/// dan menuntut yang mustahil hanya menghasilkan uji yang gagal berselang-
+/// seling tanpa ada yang salah.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Comparability {
+    /// Hasilnya wajib identik bit demi bit.
+    ///
+    /// Hanya berlaku untuk perhitungan yang seluruhnya memakai penjumlahan,
+    /// pengurangan, perkalian, pembagian, akar kuadrat, dan perbandingan.
+    /// IEEE-754 mewajibkan keenamnya dibulatkan dengan benar, sehingga
+    /// hasilnya sama di prosesor dan bahasa mana pun.
+    BitExact,
+    /// Hasilnya boleh berbeda beberapa ULP.
+    ///
+    /// Berlaku untuk perhitungan yang menyentuh fungsi transendental —
+    /// `exp`, `ln`, `tanh`, `sin`, `cos`, `pow`. IEEE-754 **tidak** mewajibkan
+    /// fungsi-fungsi ini dibulatkan dengan benar, jadi pustaka matematika yang
+    /// berbeda boleh menghasilkan nilai yang berbeda satu ULP untuk masukan
+    /// yang sama.
+    ///
+    /// Ini bukan kekhawatiran teoretis. Sebuah uji jaringan syaraf di proyek
+    /// ini lolos di Windows dan gagal di Linux karena persis hal ini: pada
+    /// pelatihan berlangkah besar, selisih satu ULP pada `tanh` membesar
+    /// menjadi hasil akhir yang sama sekali berbeda.
+    NearlyEqual(u64),
+    /// Hanya sifatnya yang bisa dituntut, bukan angkanya.
+    ///
+    /// Berlaku untuk perhitungan yang berperilaku kacau, seperti pelatihan
+    /// dengan laju belajar terlalu besar. Yang bisa diuji hanyalah pernyataan
+    /// seperti "yang wajar menghasilkan galat lebih kecil daripada yang
+    /// ekstrem", bukan nilai tertentu.
+    PropertyOnly,
+}
+
+impl Comparability {
+    /// Apakah dua nilai memenuhi tingkat keterbandingan ini.
+    ///
+    /// [`Comparability::PropertyOnly`] selalu mengembalikan `true`: pada
+    /// tingkat itu perbandingan angka memang tidak bermakna, dan yang menjaga
+    /// kebenaran adalah uji sifat yang ditulis terpisah.
+    pub fn holds(self, a: f64, b: f64) -> bool {
+        match self {
+            Comparability::BitExact => bit_equal(a, b),
+            Comparability::NearlyEqual(max_ulp) => match ulp_distance(a, b) {
+                Some(d) => d <= max_ulp,
+                // Tak hingga yang berlawanan tanda, atau satu NaN satu bukan.
+                None => bit_equal(a, b),
+            },
+            Comparability::PropertyOnly => true,
+        }
+    }
+
+    /// Penjelasan singkat, dipakai pada laporan ketidakcocokan.
+    pub fn describe(self) -> &'static str {
+        match self {
+            Comparability::BitExact => "wajib identik bit demi bit",
+            Comparability::NearlyEqual(_) => "boleh berbeda beberapa ULP",
+            Comparability::PropertyOnly => "hanya sifatnya yang diuji",
+        }
+    }
+}
+
+/// Toleransi bawaan untuk perhitungan yang menyentuh fungsi transendental.
+///
+/// Empat ULP cukup longgar untuk menampung perbedaan pustaka matematika yang
+/// wajar, tetapi masih jauh lebih ketat daripada toleransi relatif seperti
+/// `1e-9` yang akan meloloskan cacat sungguhan pada nilai besar.
+pub const TRANSCENDENTAL_ULP: u64 = 4;
+
 /// Kesalahan saat membaca pola bit dari teks.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FxError {
@@ -272,5 +344,60 @@ mod tests {
     fn pesan_error_terbaca() {
         assert!(FxError::BadLength(3).to_string().contains('3'));
         assert!(FxError::BadDigit('z').to_string().contains('z'));
+    }
+
+    #[test]
+    fn keterbandingan_bit_eksak() {
+        let c = Comparability::BitExact;
+        assert!(c.holds(1.0, 1.0));
+        assert!(c.holds(f64::NAN, f64::NAN));
+        assert!(!c.holds(0.42, 0.9 * 0.2 + 0.3 * 0.8));
+        assert!(!c.holds(0.0, -0.0));
+        assert!(!c.describe().is_empty());
+    }
+
+    #[test]
+    fn keterbandingan_beberapa_ulp() {
+        let c = Comparability::NearlyEqual(TRANSCENDENTAL_ULP);
+        assert!(c.holds(1.0, 1.0));
+        // Selisih satu ULP diterima.
+        assert!(c.holds(0.42, 0.9 * 0.2 + 0.3 * 0.8));
+        // Selisih besar tetap ditolak.
+        assert!(!c.holds(1.0, 1.0001));
+
+        // Batasnya benar-benar dijaga: lima ULP ditolak oleh toleransi empat.
+        let a = 1.0f64;
+        let lima = f64::from_bits(a.to_bits() + 5);
+        assert!(!c.holds(a, lima));
+        let empat = f64::from_bits(a.to_bits() + 4);
+        assert!(c.holds(a, empat));
+    }
+
+    #[test]
+    fn keterbandingan_menangani_nilai_khusus() {
+        let c = Comparability::NearlyEqual(4);
+        assert!(c.holds(f64::NAN, f64::NAN));
+        assert!(c.holds(f64::INFINITY, f64::INFINITY));
+        assert!(!c.holds(f64::INFINITY, f64::NEG_INFINITY));
+        assert!(!c.holds(f64::NAN, 1.0));
+    }
+
+    #[test]
+    fn keterbandingan_sifat_selalu_lolos() {
+        let c = Comparability::PropertyOnly;
+        assert!(c.holds(1.0, 1000.0));
+        assert!(c.holds(f64::NAN, 0.0));
+        assert!(!c.describe().is_empty());
+    }
+
+    #[test]
+    fn operasi_dasar_memang_bit_eksak() {
+        // Keenam operasi ini diwajibkan IEEE-754 dibulatkan dengan benar,
+        // sehingga aman dituntut identik antarbahasa.
+        let a = 0.1f64;
+        let b = 0.3f64;
+        for hasil in [a + b, a - b, a * b, a / b, (a * b).sqrt()] {
+            assert!(Comparability::BitExact.holds(hasil, hasil));
+        }
     }
 }

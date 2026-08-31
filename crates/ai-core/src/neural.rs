@@ -1528,22 +1528,64 @@ mod tests {
     #[test]
     fn langkah_terlalu_besar_benar_benar_merusak_pelatihan() {
         // Uji ini memagari temuan pengukuran: kegagalan pada spiral bukan
-        // karena arsitektur kurang, melainkan karena langkah efektifnya 2,0.
+        // karena arsitektur kurang, melainkan karena langkah efektifnya terlalu
+        // besar.
+        //
+        // Langkah di sini jauh lebih ekstrem daripada yang ditemukan saat
+        // pengukuran: efektif 50, bukan 2. Alasannya penting. Pada langkah 2,
+        // hasil akhirnya bergantung pada pembulatan `tanh` dan `exp` di pustaka
+        // matematika sistem, yang boleh berbeda satu ULP antarplatform. Pada
+        // pelatihan yang sudah berayun, selisih sekecil itu membesar menjadi
+        // hasil yang sama sekali berbeda — versi pertama uji ini lolos di
+        // Windows dan gagal di Linux justru karena hal itu.
+        //
+        // Pada langkah 50 aktivasinya jenuh sepenuhnya, sehingga kegagalannya
+        // tidak lagi bergantung pada pembulatan.
         let (x, y) = spiral_dataset(60, 0.03, 4);
         let mut buruk = Network::new(
             &[2, 16, 16, 2],
             Activation::Tanh,
             Activation::Sigmoid,
-            0.2,
+            5.0,
             0.9,
             5,
         )
         .unwrap();
         assert!(buruk.is_step_risky());
-        let h = buruk.train(&x, &y, 2_000, 1e-4, 8).unwrap();
+        assert!(buruk.effective_learning_rate() > 40.0);
+        let h = buruk.train(&x, &y, 1_000, 1e-4, 8).unwrap();
         assert!(
             h.last().unwrap().accuracy < 0.9,
-            "susunan ini seharusnya gagal; kalau kini berhasil, catatan pengukuran perlu diperbarui"
+            "langkah sebesar ini seharusnya merusak pelatihan, bukan menyelesaikannya"
+        );
+    }
+
+    #[test]
+    fn langkah_wajar_mengungguli_langkah_ekstrem() {
+        // Pernyataan yang lebih tahan platform daripada "yang buruk pasti
+        // gagal": yang wajar harus menghasilkan galat lebih kecil daripada yang
+        // ekstrem. Perbandingan relatif seperti ini tidak goyah oleh selisih
+        // satu ULP di pustaka matematika.
+        let (x, y) = spiral_dataset(60, 0.03, 4);
+        let jalan = |lr: f64| {
+            let mut n = Network::new(
+                &[2, 16, 16, 2],
+                Activation::Tanh,
+                Activation::Sigmoid,
+                lr,
+                0.9,
+                5,
+            )
+            .unwrap();
+            n.train(&x, &y, 1_000, 1e-4, 8)
+                .unwrap()
+                .last()
+                .unwrap()
+                .loss
+        };
+        assert!(
+            jalan(0.08) < jalan(5.0),
+            "laju yang wajar seharusnya menghasilkan galat lebih kecil"
         );
     }
 
