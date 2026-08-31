@@ -73,6 +73,9 @@ describe("pembantu SVG", () => {
     const c = canvasSvg(640, 120);
     expect(c.getAttribute("viewBox")).toBe("0 0 640 120");
     expect(c.getAttribute("width")).toBe("100%");
+    // Tinggi diatur lembar gaya, bukan atribut: `height="auto"` bukan panjang
+    // yang sah dan ditolak peramban.
+    expect(c.hasAttribute("height")).toBe(false);
   });
 });
 

@@ -135,10 +135,13 @@ export function figure(options: FigureOptions): HTMLElement {
  * di layar sempit tanpa satu baris pun kode ukur-mengukur.
  */
 export function canvasSvg(width: number, height: number): SVGSVGElement {
+  // Tinggi sengaja tidak disetel sebagai atribut. Atribut `height` pada SVG
+  // menuntut panjang, bukan nilai CSS: `height="auto"` ditolak peramban dengan
+  // peringatan lalu diabaikan. Perbandingannya sudah dijaga `viewBox`, dan
+  // tingginya diatur `.viz__svg` di lembar gaya.
   return svg("svg", {
     viewBox: `0 0 ${width} ${height}`,
     width: "100%",
-    height: "auto",
     preserveAspectRatio: "xMidYMid meet",
     class: "viz__svg",
   });
