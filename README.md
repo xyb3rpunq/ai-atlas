@@ -88,7 +88,7 @@ Penggolongan ini menentukan bentuk harness Go dan PL/SQL nanti. Tanpa itu, selur
 | 07 | Representasi Pengetahuan | Logika proposisi, resolusi, jaringan semantik, bingkai | ⏳ |
 | 08 | Teknik Pencarian | **Sembilan algoritma** diadu di satu peta: BFS, DFS, DLS, IDDFS, UCS, Greedy, **A\***, hill climbing, annealing | ✅ |
 | 09 | Jaringan Syaraf Tiruan | Perceptron, **backpropagation** yang diverifikasi gradien numerik, batas keputusan & kurva galat langsung | ✅ |
-| 10 | Pemrosesan Bahasa Alami | Tokenisasi, stemming Bahasa Indonesia, TF-IDF | ⏳ |
+| 10 | Pemrosesan Bahasa Alami | **Stemmer Nazief-Adriani** Bahasa Indonesia, TF-IDF, kemiripan kosinus, jarak sunting, sentimen berpengingkaran | ✅ |
 | 11 | Sistem Pakar | **Runut maju & mundur** pada basis pengetahuan yang sama, pemangkasan pertanyaan, fasilitas penjelasan | ✅ |
 | 12 | Sains Data & Big Data | Penskalaan, matriks konfusi, presisi/kepekaan/F1, **ketepatan pembanding** | ✅ |
 | 13 | Machine Learning | **KNN** dengan wilayah keputusan, **K-Means++**, **pohon ID3** dengan entropi & perolehan informasi, regresi | ✅ |
@@ -105,7 +105,7 @@ Batas ini diperiksa otomatis di CI. Build gagal kalau terlampaui — bukan sekad
 | WebAssembly (gzip) | ≤ 400 KB | **107 KB** |
 | JavaScript (gzip) | ≤ 60 KB | **16,4 KB** |
 | CSS (gzip) | ≤ 20 KB | **2,8 KB** |
-| Total muat pertama (gzip) | ≤ 460 KB | **196,6 KB** |
+| Total muat pertama (gzip) | ≤ 460 KB | **219,7 KB** |
 | Dependensi saat berjalan | 0 | **0** |
 
 Tidak ada React, tidak ada kerangka kerja, tidak ada CDN. Seluruh antarmukanya hanya beberapa lusin simpul DOM, jadi membangunnya langsung lebih ringan daripada memuat pustaka mana pun.
@@ -151,12 +151,13 @@ Setiap fungsi publik punya uji. Bukan uji jalur bahagia saja — uji nilai batas
 | `neural.rs` | 32 | 42 |
 | `expert.rs` | 26 | 30 |
 | `ml.rs` | 30 | 50 |
+| `nlp.rs` | 22 | 43 |
 | `fx.rs` | 8 | 17 |
 | `rng.rs` | 9 | 16 |
 | `lib.rs` | 2 | 4 |
-| `ai-wasm/lib.rs` | 34 | 46 |
+| `ai-wasm/lib.rs` | 40 | 54 |
 | `web/src/ui.ts` | 11 | 15 |
-| **Total** | **222** | **386** |
+| **Total** | **250** | **437** |
 
 Beberapa uji yang menahan seluruh proyek ini tetap jujur:
 
@@ -208,6 +209,7 @@ ai-atlas/
 │   │       ├── search.rs      Sesi 8 — Teknik Pencarian
 │   │       ├── neural.rs      Sesi 9 — Jaringan Syaraf Tiruan
 │   │       ├── expert.rs      Sesi 11 — Sistem Pakar
+│   │       ├── nlp.rs         Sesi 10 — Pemrosesan Bahasa Alami
 │   │       ├── ml.rs          Sesi 12-13 — Sains Data & Machine Learning
 │   │       ├── fx.rs          Pertukaran pecahan bit-eksak
 │   │       └── rng.rs         SplitMix64 deterministik

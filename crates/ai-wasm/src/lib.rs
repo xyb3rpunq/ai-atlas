@@ -791,6 +791,13 @@ pub fn ml_knn_predict(
 }
 
 /// Wilayah keputusan KNN pada kisi seragam, untuk digambar sebagai latar.
+///
+/// Jumlah argumennya melewati ambang clippy. Membungkusnya menjadi satu struktur
+/// justru memperburuk keadaan di sini: setiap argumen harus melintasi batas
+/// WebAssembly, dan `wasm-bindgen` hanya menerima tipe sederhana, sehingga
+/// pembungkusnya harus melewati JSON dan menambah satu jalur kesalahan baru
+/// untuk masalah yang murni kosmetik.
+#[allow(clippy::too_many_arguments)]
 #[wasm_bindgen]
 pub fn ml_knn_regions(
     x_json: &str,
@@ -1032,6 +1039,150 @@ pub fn ml_tennis_dataset() -> String {
         x,
         y,
     })
+}
+
+// ---------------------------------------------------------------------------
+// Sesi 10 — Pemrosesan Bahasa Alami
+// ---------------------------------------------------------------------------
+
+/// Memenggal teks, membuang kata henti bila diminta, lalu mencari kata dasarnya.
+///
+/// Seluruh tahap dikembalikan sekaligus supaya antarmuka bisa memperlihatkan
+/// apa yang hilang di tiap langkah — bagian yang paling sering mengejutkan
+/// orang adalah berapa banyak kata yang lenyap saat kata henti dibuang.
+#[wasm_bindgen]
+pub fn nlp_pipeline(text: &str, remove_stop: bool, do_stem: bool) -> String {
+    let tokens = ai_core::nlp::tokenize(text);
+    let after_stop = if remove_stop {
+        ai_core::nlp::remove_stopwords(&tokens, ai_core::nlp::STOPWORDS_ID)
+    } else {
+        tokens.clone()
+    };
+    let stems = if do_stem {
+        after_stop
+            .iter()
+            .map(|t| ai_core::nlp::stem_id(t, ai_core::nlp::DICTIONARY_ID))
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+
+    #[derive(Serialize)]
+    struct Out {
+        sentences: Vec<String>,
+        tokens: Vec<String>,
+        after_stopwords: Vec<String>,
+        stems: Vec<ai_core::nlp::StemResult>,
+        final_tokens: Vec<String>,
+    }
+    let final_tokens = if do_stem {
+        stems.iter().map(|s| s.stem.clone()).collect()
+    } else {
+        after_stop.clone()
+    };
+    ok(Out {
+        sentences: ai_core::nlp::sentences(text),
+        tokens,
+        after_stopwords: after_stop,
+        stems,
+        final_tokens,
+    })
+}
+
+/// Pencarian kata dasar satu kata beserta jejak pengupasannya.
+#[wasm_bindgen]
+pub fn nlp_stem(word: &str) -> String {
+    ok(ai_core::nlp::stem_id(word, ai_core::nlp::DICTIONARY_ID))
+}
+
+/// Bobot TF-IDF sebuah korpus, ditambah matriks kemiripan kosinus antardokumen.
+#[wasm_bindgen]
+pub fn nlp_tfidf(documents_json: &str, remove_stop: bool, do_stem: bool) -> String {
+    let texts: Vec<String> = match serde_json::from_str(documents_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    if texts.is_empty() {
+        return err("korpus kosong");
+    }
+
+    let docs: Vec<Vec<String>> = texts
+        .iter()
+        .map(|text| {
+            let tokens = ai_core::nlp::tokenize(text);
+            let tokens = if remove_stop {
+                ai_core::nlp::remove_stopwords(&tokens, ai_core::nlp::STOPWORDS_ID)
+            } else {
+                tokens
+            };
+            if do_stem {
+                ai_core::nlp::stem_all(&tokens, ai_core::nlp::DICTIONARY_ID)
+            } else {
+                tokens
+            }
+        })
+        .collect();
+
+    match ai_core::nlp::tf_idf(&docs) {
+        Ok(model) => {
+            let n = model.vectors.len();
+            let mut similarity = vec![vec![0.0; n]; n];
+            for (i, row) in similarity.iter_mut().enumerate() {
+                for (j, cell) in row.iter_mut().enumerate() {
+                    match ai_core::nlp::cosine_similarity(&model.vectors[i], &model.vectors[j]) {
+                        Ok(v) => *cell = v,
+                        Err(e) => return err(e),
+                    }
+                }
+            }
+            #[derive(Serialize)]
+            struct Out {
+                vocabulary: Vec<String>,
+                idf: Vec<f64>,
+                vectors: Vec<Vec<f64>>,
+                similarity: Vec<Vec<f64>>,
+                documents: Vec<Vec<String>>,
+            }
+            ok(Out {
+                vocabulary: model.vocabulary,
+                idf: model.idf,
+                vectors: model.vectors,
+                similarity,
+                documents: docs,
+            })
+        }
+        Err(e) => err(e),
+    }
+}
+
+/// Jarak sunting dan kemiripannya antara dua kata.
+#[wasm_bindgen]
+pub fn nlp_levenshtein(a: &str, b: &str) -> String {
+    #[derive(Serialize)]
+    struct Out {
+        distance: usize,
+        similarity: f64,
+    }
+    ok(Out {
+        distance: ai_core::nlp::levenshtein(a, b),
+        similarity: ai_core::nlp::levenshtein_similarity(a, b),
+    })
+}
+
+/// N-gram kata dari sebuah teks.
+#[wasm_bindgen]
+pub fn nlp_ngrams(text: &str, n: usize) -> String {
+    let tokens = ai_core::nlp::tokenize(text);
+    match ai_core::nlp::ngrams(&tokens, n) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+/// Analisis sentimen berbasis leksikon yang menghormati pengingkaran.
+#[wasm_bindgen]
+pub fn nlp_sentiment(text: &str) -> String {
+    ok(ai_core::nlp::sentiment_id(&ai_core::nlp::tokenize(text)))
 }
 
 #[cfg(test)]
@@ -1574,5 +1725,88 @@ mod tests {
         assert!(out.contains("macro_f1"));
         assert!(ml_evaluate("bukan", "[]").contains("err"));
         assert!(ml_evaluate(r#"["A"]"#, "[]").contains("err"));
+    }
+
+    #[test]
+    fn pipeline_nlp_lewat_jembatan() {
+        let out = nlp_pipeline("Saya suka membaca buku di kampus.", true, true);
+        assert!(!out.contains(r#""err""#), "{out}");
+        assert!(out.contains("tokens"));
+        assert!(out.contains("after_stopwords"));
+        assert!(out.contains("final_tokens"));
+        // Kata henti "saya" dan "di" harus hilang setelah tahap kedua.
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        let setelah: Vec<String> =
+            serde_json::from_value(v["ok"]["after_stopwords"].clone()).unwrap();
+        assert!(!setelah.contains(&"saya".to_string()));
+        assert!(!setelah.contains(&"di".to_string()));
+        assert!(setelah.contains(&"kampus".to_string()));
+    }
+
+    #[test]
+    fn pipeline_nlp_bisa_dimatikan_tahapnya() {
+        let out = nlp_pipeline("Saya suka membaca", false, false);
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        let tokens: Vec<String> = serde_json::from_value(v["ok"]["tokens"].clone()).unwrap();
+        let akhir: Vec<String> = serde_json::from_value(v["ok"]["final_tokens"].clone()).unwrap();
+        assert_eq!(tokens, akhir, "tanpa tahap apa pun, hasilnya harus sama");
+    }
+
+    #[test]
+    fn stemming_lewat_jembatan() {
+        let out = nlp_stem("menyapu");
+        assert!(out.contains(r#""stem":"sapu""#), "{out}");
+        assert!(out.contains(r#""in_dictionary":true"#));
+        assert!(out.contains("steps"));
+        // Kata kamus tidak dikupas sama sekali.
+        assert!(nlp_stem("beruang").contains(r#""stem":"beruang""#));
+    }
+
+    #[test]
+    fn tfidf_lewat_jembatan() {
+        let docs = r#"["kucing suka ikan","kucing gemar ikan","mobil melaju cepat"]"#;
+        let out = nlp_tfidf(docs, true, false);
+        assert!(!out.contains(r#""err""#), "{out}");
+        assert!(out.contains("vocabulary"));
+        assert!(out.contains("similarity"));
+
+        // Dokumen pertama dan kedua harus lebih mirip daripada dengan ketiga.
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        let sim: Vec<Vec<f64>> = serde_json::from_value(v["ok"]["similarity"].clone()).unwrap();
+        assert!(sim[0][1] > sim[0][2], "{:?}", sim);
+        // Diagonalnya harus satu.
+        for (i, row) in sim.iter().enumerate() {
+            assert!((row[i] - 1.0).abs() < 1e-9, "diagonal {i} = {}", row[i]);
+        }
+    }
+
+    #[test]
+    fn tfidf_menolak_masukan_salah() {
+        assert!(nlp_tfidf("bukan", true, false).contains("err"));
+        assert!(nlp_tfidf("[]", true, false).contains("err"));
+    }
+
+    #[test]
+    fn levenshtein_lewat_jembatan() {
+        let out = nlp_levenshtein("kitten", "sitting");
+        assert!(out.contains(r#""distance":3"#), "{out}");
+        assert!(out.contains("similarity"));
+        assert!(nlp_levenshtein("sama", "sama").contains(r#""distance":0"#));
+    }
+
+    #[test]
+    fn ngram_lewat_jembatan() {
+        let out = nlp_ngrams("a b c d", 2);
+        assert!(out.contains("a b"), "{out}");
+        assert!(nlp_ngrams("a b", 0).contains("err"));
+    }
+
+    #[test]
+    fn sentimen_lewat_jembatan() {
+        assert!(nlp_sentiment("pelayanannya bagus").contains(r#""label":"positif""#));
+        assert!(nlp_sentiment("pelayanannya buruk").contains(r#""label":"negatif""#));
+        // Pengingkaran harus membalik hasilnya.
+        let out = nlp_sentiment("makanannya tidak bagus");
+        assert!(out.contains(r#""label":"negatif""#), "{out}");
     }
 }

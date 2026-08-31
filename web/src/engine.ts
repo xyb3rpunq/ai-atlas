@@ -835,3 +835,93 @@ export function mlEvaluate(actual: string[], predicted: string[]): Evaluation {
 export function mlTennisDataset(): TennisDataset {
   return unwrap<TennisDataset>(wasm.ml_tennis_dataset());
 }
+
+// ---------------------------------------------------------------------------
+// Sesi 10 — Pemrosesan Bahasa Alami
+// ---------------------------------------------------------------------------
+
+/** Satu langkah pengupasan imbuhan. */
+export interface StemStep {
+  kind: string;
+  affix: string;
+  result: string;
+}
+
+/** Hasil pencarian kata dasar beserta jejaknya. */
+export interface StemResult {
+  original: string;
+  stem: string;
+  steps: StemStep[];
+  in_dictionary: boolean;
+}
+
+/** Hasil seluruh tahap pemrosesan teks. */
+export interface NlpPipeline {
+  sentences: string[];
+  tokens: string[];
+  after_stopwords: string[];
+  stems: StemResult[];
+  final_tokens: string[];
+}
+
+/** Bobot TF-IDF sebuah korpus beserta kemiripan antardokumen. */
+export interface TfIdfResult {
+  vocabulary: string[];
+  idf: number[];
+  vectors: number[][];
+  similarity: number[][];
+  documents: string[][];
+}
+
+/** Jarak sunting dan kemiripannya. */
+export interface EditDistance {
+  distance: number;
+  similarity: number;
+}
+
+/** Hasil analisis sentimen. */
+export interface Sentiment {
+  score: number;
+  label: string;
+  matches: [string, number][];
+}
+
+/** Memenggal, membuang kata henti, lalu mencari kata dasarnya. */
+export function nlpPipeline(
+  text: string,
+  removeStopwords: boolean,
+  stem: boolean,
+): NlpPipeline {
+  return unwrap<NlpPipeline>(wasm.nlp_pipeline(text, removeStopwords, stem));
+}
+
+/** Pencarian kata dasar satu kata beserta jejaknya. */
+export function nlpStem(word: string): StemResult {
+  return unwrap<StemResult>(wasm.nlp_stem(word));
+}
+
+/** Bobot TF-IDF sebuah korpus. */
+export function nlpTfIdf(
+  documents: string[],
+  removeStopwords: boolean,
+  stem: boolean,
+): TfIdfResult {
+  return unwrap<TfIdfResult>(
+    wasm.nlp_tfidf(JSON.stringify(documents), removeStopwords, stem),
+  );
+}
+
+/** Jarak sunting antara dua kata. */
+export function nlpLevenshtein(a: string, b: string): EditDistance {
+  return unwrap<EditDistance>(wasm.nlp_levenshtein(a, b));
+}
+
+/** N-gram kata dari sebuah teks. */
+export function nlpNgrams(text: string, n: number): string[] {
+  return unwrap<string[]>(wasm.nlp_ngrams(text, n));
+}
+
+/** Analisis sentimen berbasis leksikon. */
+export function nlpSentiment(text: string): Sentiment {
+  return unwrap<Sentiment>(wasm.nlp_sentiment(text));
+}

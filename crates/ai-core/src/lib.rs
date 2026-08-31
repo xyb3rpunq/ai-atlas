@@ -25,6 +25,7 @@
 //! | 8 | Teknik Pencarian | [`search`] |
 //! | 9 | Jaringan Syaraf Tiruan | [`neural`] |
 //! | 11 | Sistem Pakar | [`expert`] |
+//! | 10 | Pemrosesan Bahasa Alami | [`nlp`] |
 //! | 12-13 | Sains Data & Machine Learning | [`ml`] |
 //! | — | Penunjang: keacakan deterministik | [`rng`] |
 //! | — | Penunjang: pertukaran pecahan bit-eksak | [`fx`] |
@@ -40,6 +41,7 @@ pub mod fuzzy;
 pub mod fx;
 pub mod ml;
 pub mod neural;
+pub mod nlp;
 pub mod rng;
 pub mod search;
 
@@ -96,6 +98,12 @@ pub const SESSIONS: &[SessionInfo] = &[
         module: "neural",
         title_id: "Jaringan Syaraf Tiruan",
         title_en: "Artificial Neural Networks",
+    },
+    SessionInfo {
+        session: 10,
+        module: "nlp",
+        title_id: "Pemrosesan Bahasa Alami",
+        title_en: "Natural Language Processing",
     },
     SessionInfo {
         session: 11,
