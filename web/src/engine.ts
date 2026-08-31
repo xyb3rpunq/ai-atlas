@@ -267,3 +267,119 @@ export function fuzzyInfer(
     ),
   );
 }
+
+// ---------------------------------------------------------------------------
+// Sesi 8 — Teknik Pencarian
+// ---------------------------------------------------------------------------
+
+/** Sebuah titik pada kisi. */
+export interface Point {
+  x: number;
+  y: number;
+}
+
+/** Kisi tempat pencarian berlangsung. */
+export interface Grid {
+  width: number;
+  height: number;
+  /** `true` berarti dinding. Panjangnya `width * height`, baris demi baris. */
+  walls: boolean[];
+  diagonal: boolean;
+}
+
+/** Algoritma pencarian yang tersedia. */
+export type Algorithm =
+  | "breadth_first"
+  | "depth_first"
+  | "depth_limited"
+  | "iterative_deepening"
+  | "uniform_cost"
+  | "greedy_best_first"
+  | "a_star"
+  | "hill_climbing"
+  | "simulated_annealing";
+
+/** Fungsi heuristik yang tersedia. */
+export type Heuristic = "manhattan" | "euclidean" | "chebyshev" | "zero";
+
+/** Pengaturan sebuah pencarian. */
+export interface SearchOptions {
+  algorithm: Algorithm;
+  heuristic: Heuristic;
+  depth_limit: number;
+  seed: number;
+  max_expansions: number;
+}
+
+/** Hasil sebuah pencarian. */
+export interface SearchResult {
+  path: Point[];
+  /** Urutan sel yang dibuka, dipakai untuk menganimasikan pencarian. */
+  expanded: Point[];
+  cost: number;
+  found: boolean;
+  expansions: number;
+  peak_frontier: number;
+}
+
+/** Satu baris pada tabel perbandingan antaralgoritma. */
+export interface CompareRow {
+  algorithm: Algorithm;
+  name: string;
+  optimal: boolean;
+  uses_heuristic: boolean;
+  found: boolean;
+  /** Biaya jalur; bernilai `-1` bila tujuan tidak tercapai. */
+  cost: number;
+  steps: number;
+  expansions: number;
+  peak_frontier: number;
+}
+
+/** Kisi kosong tanpa dinding. */
+export function searchEmptyGrid(width: number, height: number): Grid {
+  return unwrap<Grid>(wasm.search_empty_grid(width, height));
+}
+
+/** Labirin acak yang dijamin punya jalur keluar. */
+export function searchMaze(width: number, height: number, seed: number): Grid {
+  return unwrap<Grid>(wasm.search_maze(width, height, BigInt(seed)));
+}
+
+/** Menjalankan satu pencarian. */
+export function searchRun(
+  grid: Grid,
+  start: Point,
+  goal: Point,
+  options: SearchOptions,
+): SearchResult {
+  return unwrap<SearchResult>(
+    wasm.search_run(
+      JSON.stringify(grid),
+      start.x,
+      start.y,
+      goal.x,
+      goal.y,
+      JSON.stringify(options),
+    ),
+  );
+}
+
+/** Menjalankan seluruh algoritma pada kisi yang sama untuk dibandingkan. */
+export function searchCompare(
+  grid: Grid,
+  start: Point,
+  goal: Point,
+  options: SearchOptions,
+): CompareRow[] {
+  return unwrap<CompareRow[]>(
+    wasm.search_compare(
+      JSON.stringify(grid),
+      start.x,
+      start.y,
+      goal.x,
+      goal.y,
+      JSON.stringify(options),
+    ),
+  );
+}

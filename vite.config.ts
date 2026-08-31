@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 
 /**
  * Situs dilayani dari https://xyb3rpunq.github.io/ai-atlas/, jadi seluruh
@@ -8,7 +8,33 @@ import { defineConfig } from "vite";
  */
 const base = process.env.AI_ATLAS_BASE ?? "/ai-atlas/";
 
+/**
+ * Melepas meta kebijakan keamanan konten saat pengembangan.
+ *
+ * Berkas sumber memuat penanda `REPLACE_BOOT_HASH` yang baru diganti sidik
+ * sungguhan oleh `scripts/csp.mjs` setelah build. Penanda itu bukan sidik yang
+ * sah, sehingga peladen pengembangan akan memblokir skrip pemulih tema dan
+ * halaman berkedip putih di tiap muat ulang. Peladen pengembangan juga
+ * menyuntikkan modul HMR yang memang tidak tercakup kebijakan produksi.
+ *
+ * Kebijakan tetap diuji: `scripts/verify-dist.mjs` memeriksa hasil build, dan
+ * pemeriksaan itulah yang menentukan apa yang sampai ke pengguna.
+ */
+function stripCspInDev(): Plugin {
+  return {
+    name: "ai-atlas:strip-csp-in-dev",
+    apply: "serve",
+    transformIndexHtml(html) {
+      return html.replace(
+        /\s*<meta\s+http-equiv="Content-Security-Policy"[\s\S]*?\/>/i,
+        "",
+      );
+    },
+  };
+}
+
 export default defineConfig({
+  plugins: [stripCspInDev()],
   base,
   root: "web",
   publicDir: "public",

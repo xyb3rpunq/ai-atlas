@@ -267,6 +267,135 @@ pub fn fuzzy_infer(
     }
 }
 
+// ---------------------------------------------------------------------------
+// Sesi 8 — Teknik Pencarian
+// ---------------------------------------------------------------------------
+
+/// Menjalankan pencarian pada sebuah kisi.
+///
+/// `grid_json` berbentuk `{"width":21,"height":21,"walls":[...],"diagonal":false}`
+/// dan `options_json` berbentuk
+/// `{"algorithm":"a_star","heuristic":"manhattan","depth_limit":64,"seed":1,"max_expansions":100000}`.
+#[wasm_bindgen]
+pub fn search_run(
+    grid_json: &str,
+    start_x: usize,
+    start_y: usize,
+    goal_x: usize,
+    goal_y: usize,
+    options_json: &str,
+) -> String {
+    let grid: ai_core::search::Grid = match serde_json::from_str(grid_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let options: ai_core::search::SearchOptions = match serde_json::from_str(options_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    match ai_core::search::search(
+        &grid,
+        ai_core::search::Point::new(start_x, start_y),
+        ai_core::search::Point::new(goal_x, goal_y),
+        options,
+    ) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+/// Membangun labirin acak yang dijamin punya jalur keluar.
+#[wasm_bindgen]
+pub fn search_maze(width: usize, height: usize, seed: u64) -> String {
+    match ai_core::search::generate_maze(width, height, seed) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+/// Kisi kosong tanpa dinding.
+#[wasm_bindgen]
+pub fn search_empty_grid(width: usize, height: usize) -> String {
+    match ai_core::search::Grid::new(width, height) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+/// Menjalankan seluruh algoritma pada kisi yang sama untuk dibandingkan.
+///
+/// Ini bentuk yang paling mengajarkan sesuatu: jalur yang sama panjang bisa
+/// menuntut jumlah simpul yang dibuka jauh berbeda.
+#[wasm_bindgen]
+pub fn search_compare(
+    grid_json: &str,
+    start_x: usize,
+    start_y: usize,
+    goal_x: usize,
+    goal_y: usize,
+    options_json: &str,
+) -> String {
+    use ai_core::search::Algorithm;
+
+    let grid: ai_core::search::Grid = match serde_json::from_str(grid_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let base: ai_core::search::SearchOptions = match serde_json::from_str(options_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+
+    #[derive(Serialize)]
+    struct Row {
+        algorithm: &'static str,
+        name: &'static str,
+        optimal: bool,
+        uses_heuristic: bool,
+        found: bool,
+        cost: f64,
+        steps: usize,
+        expansions: usize,
+        peak_frontier: usize,
+    }
+
+    let all = [
+        (Algorithm::BreadthFirst, "breadth_first"),
+        (Algorithm::DepthFirst, "depth_first"),
+        (Algorithm::DepthLimited, "depth_limited"),
+        (Algorithm::IterativeDeepening, "iterative_deepening"),
+        (Algorithm::UniformCost, "uniform_cost"),
+        (Algorithm::GreedyBestFirst, "greedy_best_first"),
+        (Algorithm::AStar, "a_star"),
+        (Algorithm::HillClimbing, "hill_climbing"),
+        (Algorithm::SimulatedAnnealing, "simulated_annealing"),
+    ];
+
+    let start = ai_core::search::Point::new(start_x, start_y);
+    let goal = ai_core::search::Point::new(goal_x, goal_y);
+    let mut rows = Vec::with_capacity(all.len());
+    for (algorithm, slug) in all {
+        let options = ai_core::search::SearchOptions { algorithm, ..base };
+        match ai_core::search::search(&grid, start, goal, options) {
+            Ok(r) => rows.push(Row {
+                algorithm: slug,
+                name: algorithm.short_name(),
+                optimal: algorithm.is_optimal(),
+                uses_heuristic: algorithm.uses_heuristic(),
+                found: r.found,
+                // Biaya tak berhingga tidak punya padanan di JSON, jadi
+                // kegagalan dilaporkan lewat medan `found`, bukan angka aneh.
+                cost: if r.found { r.cost } else { -1.0 },
+                steps: r.path.len().saturating_sub(1),
+                expansions: r.expansions,
+                peak_frontier: r.peak_frontier,
+            }),
+            Err(e) => return err(e),
+        }
+    }
+    ok(rows)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -427,5 +556,70 @@ mod tests {
             let out = fuzzy_infer(&s, r#"[["X",9.0]]"#, "mamdani", m, 101);
             assert!(!out.contains("err"), "{m}: {out}");
         }
+    }
+
+    #[test]
+    fn kisi_kosong_lewat_jembatan() {
+        let out = search_empty_grid(5, 4);
+        assert!(out.contains(r#""width":5"#), "{out}");
+        assert!(search_empty_grid(0, 4).contains("err"));
+    }
+
+    #[test]
+    fn labirin_lewat_jembatan() {
+        let out = search_maze(11, 11, 7);
+        assert!(out.contains("walls"), "{out}");
+        assert!(search_maze(0, 11, 7).contains("err"));
+    }
+
+    fn kisi_uji() -> String {
+        let g = ai_core::search::Grid::new(9, 9).unwrap();
+        serde_json::to_string(&g).unwrap()
+    }
+
+    const OPSI: &str = r#"{"algorithm":"a_star","heuristic":"manhattan","depth_limit":64,"seed":1,"max_expansions":50000}"#;
+
+    #[test]
+    fn pencarian_lewat_jembatan() {
+        let out = search_run(&kisi_uji(), 0, 0, 8, 8, OPSI);
+        assert!(out.contains(r#""found":true"#), "{out}");
+        assert!(out.contains("expanded"));
+    }
+
+    #[test]
+    fn pencarian_menolak_masukan_salah() {
+        assert!(search_run("bukan", 0, 0, 8, 8, OPSI).contains("err"));
+        assert!(search_run(&kisi_uji(), 0, 0, 8, 8, "bukan").contains("err"));
+        // Titik di luar kisi harus jadi galat, bukan hasil kosong yang membingungkan.
+        assert!(search_run(&kisi_uji(), 0, 0, 99, 99, OPSI).contains("err"));
+        assert!(search_run(&kisi_uji(), 99, 0, 8, 8, OPSI).contains("err"));
+    }
+
+    #[test]
+    fn perbandingan_memuat_sembilan_algoritma() {
+        let out = search_compare(&kisi_uji(), 0, 0, 8, 8, OPSI);
+        assert!(!out.contains(r#""err""#), "{out}");
+        for slug in [
+            "breadth_first",
+            "depth_first",
+            "depth_limited",
+            "iterative_deepening",
+            "uniform_cost",
+            "greedy_best_first",
+            "a_star",
+            "hill_climbing",
+            "simulated_annealing",
+        ] {
+            assert!(out.contains(slug), "{slug} hilang dari perbandingan");
+        }
+        // Biaya tak berhingga tidak boleh bocor ke JSON sebagai null.
+        assert!(!out.contains("null"), "{out}");
+    }
+
+    #[test]
+    fn perbandingan_menolak_masukan_salah() {
+        assert!(search_compare("bukan", 0, 0, 8, 8, OPSI).contains("err"));
+        assert!(search_compare(&kisi_uji(), 0, 0, 8, 8, "{").contains("err"));
+        assert!(search_compare(&kisi_uji(), 0, 0, 99, 99, OPSI).contains("err"));
     }
 }

@@ -72,7 +72,7 @@ Karena itu seluruh vektor uji lintas bahasa memakai **16 digit heksadesimal pola
 | 05 | Logika Fuzzy I | **Enam bentuk fungsi keanggotaan**, operasi Zadeh & produk, potongan alfa | ✅ |
 | 06 | Logika Fuzzy II | **Mamdani, Sugeno, Tsukamoto** berdampingan, 5 metode defuzzifikasi | ✅ |
 | 07 | Representasi Pengetahuan | Logika proposisi, resolusi, jaringan semantik, bingkai | ⏳ |
-| 08 | Teknik Pencarian | BFS, DFS, UCS, Greedy, **A\***, hill climbing, simulated annealing | ⏳ |
+| 08 | Teknik Pencarian | **Sembilan algoritma** diadu di satu peta: BFS, DFS, DLS, IDDFS, UCS, Greedy, **A\***, hill climbing, annealing | ✅ |
 | 09 | Jaringan Syaraf Tiruan | Perceptron, **backpropagation**, kurva galat langsung | ⏳ |
 | 10 | Pemrosesan Bahasa Alami | Tokenisasi, stemming Bahasa Indonesia, TF-IDF | ⏳ |
 | 11 | Sistem Pakar | **Forward & backward chaining**, fasilitas penjelasan | ⏳ |
@@ -88,10 +88,10 @@ Batas ini diperiksa otomatis di CI. Build gagal kalau terlampaui — bukan sekad
 
 | Metrik | Anggaran | Terukur |
 |--------|---------:|--------:|
-| WebAssembly (gzip) | ≤ 400 KB | **77,5 KB** |
-| JavaScript (gzip) | ≤ 60 KB | **11,0 KB** |
+| WebAssembly (gzip) | ≤ 400 KB | **93,0 KB** |
+| JavaScript (gzip) | ≤ 60 KB | **13,7 KB** |
 | CSS (gzip) | ≤ 20 KB | **2,8 KB** |
-| Total muat pertama (gzip) | ≤ 460 KB | **97,1 KB** |
+| Total muat pertama (gzip) | ≤ 460 KB | **115,4 KB** |
 | Dependensi saat berjalan | 0 | **0** |
 
 Tidak ada React, tidak ada kerangka kerja, tidak ada CDN. Seluruh antarmukanya hanya beberapa lusin simpul DOM, jadi membangunnya langsung lebih ringan daripada memuat pustaka mana pun.
@@ -132,13 +132,14 @@ Setiap fungsi publik punya uji. Bukan uji jalur bahagia saja — uji nilai batas
 |--------|--------------:|----:|
 | `certainty.rs` | 9 | 26 |
 | `bayes.rs` | 21 | 36 |
-| `fuzzy.rs` | 24 | 40 |
+| `fuzzy.rs` | 24 | 42 |
+| `search.rs` | 22 | 41 |
 | `fx.rs` | 8 | 17 |
 | `rng.rs` | 9 | 16 |
 | `lib.rs` | 2 | 4 |
-| `ai-wasm/lib.rs` | 12 | 14 |
+| `ai-wasm/lib.rs` | 16 | 20 |
 | `web/src/ui.ts` | 11 | 15 |
-| **Total** | **96** | **173** |
+| **Total** | **122** | **237** |
 
 Contoh kasus yang dipakai sebagai uji berasal langsung dari lembar tugas mata kuliah:
 
@@ -174,6 +175,7 @@ ai-atlas/
 │   │       ├── certainty.rs   Sesi 3 — Certainty Factor
 │   │       ├── bayes.rs       Sesi 4 — Bayesian
 │   │       ├── fuzzy.rs       Sesi 5-6 — Logika Fuzzy
+│   │       ├── search.rs      Sesi 8 — Teknik Pencarian
 │   │       ├── fx.rs          Pertukaran pecahan bit-eksak
 │   │       └── rng.rs         SplitMix64 deterministik
 │   └── ai-wasm/        Jembatan wasm-bindgen. Amplop JSON ok/err.

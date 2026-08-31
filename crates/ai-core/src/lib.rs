@@ -22,6 +22,7 @@
 //! | 3 | Ketidakpastian | [`certainty`] |
 //! | 4 | Probabilitas Bayesian | [`bayes`] |
 //! | 5-6 | Logika Fuzzy | [`fuzzy`] |
+//! | 8 | Teknik Pencarian | [`search`] |
 //! | — | Penunjang: keacakan deterministik | [`rng`] |
 //! | — | Penunjang: pertukaran pecahan bit-eksak | [`fx`] |
 
@@ -34,6 +35,7 @@ pub mod certainty;
 pub mod fuzzy;
 pub mod fx;
 pub mod rng;
+pub mod search;
 
 /// Versi pustaka, diambil dari `Cargo.toml` saat kompilasi.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -76,6 +78,12 @@ pub const SESSIONS: &[SessionInfo] = &[
         module: "fuzzy",
         title_id: "Logika Fuzzy II",
         title_en: "Fuzzy Logic II",
+    },
+    SessionInfo {
+        session: 8,
+        module: "search",
+        title_id: "Teknik Pencarian dan Pelacakan",
+        title_en: "Search Techniques",
     },
 ];
 
