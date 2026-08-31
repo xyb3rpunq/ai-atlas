@@ -16,7 +16,71 @@
 import * as engine from "../engine.js";
 import { T, bi, pick } from "../i18n.js";
 import { buttonRow, card, clear, el, errorNote, table } from "../ui.js";
-import type { Lab } from "./registry.js";
+import { figure, heatmap, nodeGraph } from "../viz.js";
+import type { GraphEdge, GraphNode } from "../viz.js";
+
+/** Batas kedalaman pewarisan yang digambar. */
+const MAX_LAPIS = 5;
+
+/**
+ * Menyusun graf jaringan semantik dengan simpul terpilih sebagai jangkar.
+ *
+ * Lapisan dihitung dari relasi `adalah`: leluhur diletakkan di atas, keturunan
+ * di bawah. Relasi sifat — `punya`, `bisa`, dan sejenisnya — sengaja tidak ikut
+ * menentukan lapisan, karena sifat bukan hubungan pewarisan dan memasukkannya
+ * membuat gambar yang seharusnya berupa silsilah berubah menjadi kusut.
+ */
+function grafSemantik(view: engine.SemanticNetworkView): {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+} {
+  const naik = new Map<string, string[]>();
+  for (const r of view.relations) {
+    if (r.label !== "adalah") continue;
+    const daftar = naik.get(r.from) ?? [];
+    daftar.push(r.to);
+    naik.set(r.from, daftar);
+  }
+
+  /** Berapa langkah `adalah` dari sebuah simpul ke akar terjauhnya. */
+  function tinggi(simpul: string, sisa: number): number {
+    if (sisa <= 0) return 0;
+    const induk = naik.get(simpul);
+    if (!induk || induk.length === 0) return 0;
+    return 1 + Math.max(...induk.map((p) => tinggi(p, sisa - 1)));
+  }
+
+  const terpakai = new Set<string>([view.selected, ...view.ancestors]);
+  for (const r of view.relations) {
+    if (r.label === "adalah" && (r.to === view.selected || r.from === view.selected)) {
+      terpakai.add(r.from);
+      terpakai.add(r.to);
+    }
+  }
+  // Sifat yang diwarisi ikut digambar, karena justru dari sanalah terlihat
+  // bahwa sebuah sifat datang dari leluhur dan bukan dari simpulnya sendiri.
+  for (const r of view.properties) terpakai.add(r.from);
+
+  const tinggiMaks = Math.max(...[...terpakai].map((n) => tinggi(n, MAX_LAPIS)), 0);
+  const nodes: GraphNode[] = [...terpakai].sort().map((n) => ({
+    id: n,
+    label: n,
+    layer: tinggiMaks - tinggi(n, MAX_LAPIS),
+    tone:
+      n === view.selected ? "tujuan" : view.ancestors.includes(n) ? "aktif" : "netral",
+  }));
+
+  const edges: GraphEdge[] = view.relations
+    .filter((r) => r.label === "adalah" && terpakai.has(r.from) && terpakai.has(r.to))
+    .map((r) => ({
+      from: r.to,
+      to: r.from,
+      label: r.label,
+      active: r.from === view.selected || view.ancestors.includes(r.from),
+    }));
+
+  return { nodes, edges };
+}
 
 type Tab = "truth" | "resolution" | "network";
 
@@ -55,16 +119,14 @@ const PROOF_PRESETS: {
   },
 ];
 
-export const knowledgeLab: Lab = {
-  slug: "knowledge",
-  session: 7,
-  title: bi("Representasi Pengetahuan", "Knowledge Representation"),
-  blurb: bi(
-    "Tabel kebenaran menjawab “apakah benar” dengan mencoba semua kemungkinan; barisnya berlipat dua tiap proposisi ditambahkan. Resolusi menjawab pertanyaan yang sama dengan membuktikan — menyangkal kesimpulan lalu mencari kontradiksi. Bandingkan keduanya di sini pada kasus yang sama.",
-    "A truth table answers “is it true” by trying every possibility; its rows double with each proposition. Resolution answers the same question by proving — negating the conclusion and hunting a contradiction. Compare the two here on the same cases.",
-  ),
-
-  mount(root: HTMLElement): () => void {
+/**
+ * Memasang laboratorium ke dalam elemen yang diberikan.
+ *
+ * Keterangannya -- judul, nomor sesi, penjelasan -- ada di
+ * `labs/registry.ts`, bukan di sini, supaya daftar isi bisa ditampilkan
+ * tanpa mengunduh mesin seluruh laboratorium lebih dulu.
+ */
+export function mount(root: HTMLElement): () => void {
     let tab: Tab = "truth";
     let formula = FORMULA_PRESETS[0].formula;
     let compareWith = "~P | Q";
@@ -98,6 +160,38 @@ export const knowledgeLab: Lab = {
       }
 
       output.append(
+        card(
+          pick(bi("Seluruh dunia yang mungkin", "Every possible world")),
+          figure({
+            title: bi("Peta tabel kebenaran", "Truth table map"),
+            summary: bi(
+              `${result.rows.length} baris adalah seluruh dunia yang mungkin bagi ` +
+                `${result.variables.length} proposisi. Kolom terakhir adalah nilai rumusnya. ` +
+                `Rumus ini ${verdict}. Perhatikan jumlah barisnya: tiap proposisi baru ` +
+                `melipatduakannya, sehingga sepuluh proposisi sudah berarti 1.024 baris — ` +
+                `itulah sebabnya pembuktian yang tidak perlu memeriksa semua baris jauh lebih ` +
+                `berharga daripada tabel ini.`,
+              `${result.rows.length} rows are every possible world for ${result.variables.length} ` +
+                `propositions. The last column is the formula's value. This formula is ${verdict}. ` +
+                `Note the row count: each new proposition doubles it, so ten propositions already ` +
+                `mean 1,024 rows — which is why a proof that need not check every row is worth ` +
+                `far more than this table.`,
+            ),
+            body: heatmap({
+              rows: result.rows.map((_, i) => String(i + 1)),
+              cols: [...result.variables, pick(bi("hasil", "result"))],
+              values: result.rows.map((r) => [
+                ...r.values.map((v) => (v ? 1 : 0)),
+                r.result ? 1 : 0,
+              ]),
+              format: (v) => (v === 1 ? "B" : "S"),
+            }),
+            legend: [
+              { color: "var(--accent)", label: bi("benar", "true") },
+              { color: "var(--surface-2)", label: bi("salah", "false") },
+            ],
+          }),
+        ),
         card(
           pick(T.result),
           table(
@@ -198,6 +292,65 @@ export const knowledgeLab: Lab = {
           }),
         ),
         card(
+          pick(bi("Jalannya pembuktian", "How the proof unfolds")),
+          figure({
+            title: bi("Pohon resolusi", "Resolution tree"),
+            summary: bi(
+              proof.proved
+                ? `Klausa awal ada di baris atas. Tiap panah adalah satu langkah resolusi: ` +
+                  `dua klausa bertemu, proposisi yang berlawanan tanda saling meniadakan, dan ` +
+                  `sisanya menjadi klausa baru. Pembuktian berakhir ketika yang tersisa tidak ` +
+                  `ada sama sekali — klausa kosong, yang berarti ingkaran kesimpulan mustahil benar.`
+                : `Klausa awal ada di baris atas, dan ${proof.steps.length} langkah resolusi ` +
+                  `dijalankan tanpa pernah menghasilkan klausa kosong. Pohon yang berhenti tanpa ` +
+                  `klausa kosong bukan berarti kesimpulannya salah, hanya berarti ia tidak bisa ` +
+                  `dibuktikan dari basis pengetahuan ini.`,
+              proof.proved
+                ? `Initial clauses sit on the top row. Each arrow is one resolution step: two ` +
+                  `clauses meet, oppositely signed propositions cancel, and what remains becomes a ` +
+                  `new clause. The proof ends when nothing remains at all — the empty clause, ` +
+                  `meaning the negated conclusion cannot possibly hold.`
+                : `Initial clauses sit on the top row, and ${proof.steps.length} resolution steps ` +
+                  `ran without ever producing the empty clause. A tree that stops without it does ` +
+                  `not mean the conclusion is false, only that it cannot be proved from this ` +
+                  `knowledge base.`,
+            ),
+            body: nodeGraph(
+              [
+                ...proof.initial_clauses.map((c, i) => ({
+                  id: `k${i}`,
+                  label: c,
+                  layer: 0,
+                })),
+                ...proof.steps.map((s) => ({
+                  id: s.result,
+                  // Klausa kosong tidak punya teks, dan kotak tanpa isi tidak
+                  // memberi tahu apa pun. Ia diberi nama agar terlihat bahwa
+                  // justru simpul inilah tujuan seluruh pembuktiannya.
+                  label: s.result === "" ? "□" : s.result,
+                  layer: Math.min(4, s.order),
+                  detail: s.result === "" ? pick(bi("klausa kosong", "empty clause")) : `~${s.pivot}`,
+                  tone: s.result === "" ? ("tujuan" as const) : ("aktif" as const),
+                })),
+              ],
+              proof.steps.flatMap((s) => {
+                const cari = (teks: string): string => {
+                  const i = proof.initial_clauses.indexOf(teks);
+                  return i >= 0 ? `k${i}` : teks;
+                };
+                return [
+                  { from: cari(s.left), to: s.result, label: s.pivot, active: true },
+                  { from: cari(s.right), to: s.result, active: true },
+                ];
+              }),
+            ),
+            legend: [
+              { color: "var(--accent)", label: bi("klausa hasil resolusi", "resolved clause") },
+              { color: "var(--surface-2)", label: bi("klausa awal", "initial clause") },
+            ],
+          }),
+        ),
+        card(
           pick(bi("Klausa awal", "Initial clauses")),
           table(
             ["#", pick(bi("Klausa", "Clause"))],
@@ -245,8 +398,32 @@ export const knowledgeLab: Lab = {
 
       const langsung = view.properties.filter((r) => r.from === view.selected);
       const warisan = view.properties.filter((r) => r.from !== view.selected);
+      const graf = grafSemantik(view);
 
       output.append(
+        card(
+          pick(bi("Silsilah pewarisan", "Inheritance chain")),
+          figure({
+            title: bi("Jaringan semantik", "Semantic network"),
+            summary: bi(
+              `Panah menunjuk dari yang umum ke yang khusus. Simpul bertepi tebal adalah ` +
+                `"${view.selected}" beserta ${view.ancestors.length} leluhurnya, yaitu jalur ` +
+                `yang dilalui pewarisan sifat. Dari ${langsung.length + warisan.length} sifat ` +
+                `yang dimiliki "${view.selected}", hanya ${langsung.length} yang benar-benar ` +
+                `dituliskan padanya; sisanya datang menuruni panah-panah ini.`,
+              `Arrows point from the general to the specific. Thick-edged nodes are ` +
+                `"${view.selected}" and its ${view.ancestors.length} ancestors — the path ` +
+                `inheritance travels. Of the ${langsung.length + warisan.length} properties ` +
+                `"${view.selected}" has, only ${langsung.length} are actually written on it; ` +
+                `the rest arrive down these arrows.`,
+            ),
+            body: nodeGraph(graf.nodes, graf.edges),
+            legend: [
+              { color: "var(--accent)", label: bi("jalur pewarisan", "inheritance path") },
+              { color: "var(--surface-2)", label: bi("simpul lain", "other nodes") },
+            ],
+          }),
+        ),
         card(
           `${pick(bi("Sifat", "Properties"))}: ${view.selected}`,
           table(
@@ -462,5 +639,4 @@ export const knowledgeLab: Lab = {
     return () => {
       clear(root);
     };
-  },
-};
+}

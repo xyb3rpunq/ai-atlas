@@ -8,7 +8,9 @@
 #      ditulis terpisah, memakai 2.266 vektor uji berpola bit. Rumus yang salah
 #      tetap konsisten dengan dirinya sendiri, sehingga uji terhadap satu
 #      implementasi tidak bisa menangkapnya.
-#   5. Terbit   — hanya bila keempatnya lolos, dan hanya dari `main`.
+#   5. Oracle   — skema, PL/SQL, dan konformansi tiga arah Rust ⟷ Go ⟷ PL/SQL,
+#      ditambah 60 uji unit atas penalaran yang datanya hidup di tabel.
+#   6. Terbit   — hanya bila kelimanya lolos, dan hanya dari `main`.
 #
 # .Deckyx
 
@@ -218,9 +220,77 @@ jobs:
         working-directory: tools/conform
         run: go run .
 
+  oracle:
+    name: Oracle — skema, PL/SQL, konformansi tiga arah
+    runs-on: ubuntu-latest
+    services:
+      oracle:
+        image: gvenzl/oracle-free:23-slim
+        env:
+          ORACLE_PASSWORD: AiAtlasDev1
+          APP_USER: aiatlas
+          APP_USER_PASSWORD: AiAtlasDev1
+        ports:
+          - 1521:1521
+        # Basis data butuh waktu untuk membuka diri. Tanpa health check,
+        # langkah berikutnya menabrak listener yang belum siap dan gagal dengan
+        # pesan yang tidak menyebut penyebab sebenarnya.
+        options: >-
+          --health-cmd healthcheck.sh
+          --health-interval 20s
+          --health-timeout 10s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Pasang toolchain Rust
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-oracle-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: cargo-oracle-${{ runner.os }}-
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Hasilkan vektor uji dari implementasi Rust
+        run: cargo run -p ai-core --bin export_vectors
+
+      - name: Pasang Oracle Instant Client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends unzip libaio1t64
+          # Instant Client menautkan libaio.so.1; Ubuntu 24.04 memaketkannya
+          # sebagai libaio.so.1t64 setelah peralihan time_t 64-bit.
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libaio.so.1t64 /usr/lib/x86_64-linux-gnu/libaio.so.1
+          curl -fsSLO https://download.oracle.com/otn_software/linux/instantclient/instantclient-basiclite-linuxx64.zip
+          curl -fsSLO https://download.oracle.com/otn_software/linux/instantclient/instantclient-sqlplus-linuxx64.zip
+          sudo mkdir -p /opt/oracle
+          sudo unzip -q -o instantclient-basiclite-linuxx64.zip -d /opt/oracle
+          sudo unzip -q -o instantclient-sqlplus-linuxx64.zip -d /opt/oracle
+          IC=$(ls -d /opt/oracle/instantclient_*)
+          echo "$IC" >> "$GITHUB_PATH"
+          echo "LD_LIBRARY_PATH=$IC" >> "$GITHUB_ENV"
+
+      # Konformansi PL/SQL menjalankan algoritma yang sama untuk ketiga
+      # kalinya. Rumus yang salah tetap konsisten dengan dirinya sendiri; tiga
+      # implementasi mandiri yang sepakat adalah bukti yang tidak bisa
+      # diberikan uji terhadap satu implementasi mana pun.
+      - name: Skema, PL/SQL, konformansi, uji unit
+        env:
+          AI_ATLAS_ORACLE_MODE: langsung
+        run: bash oracle/run.sh
+
   deploy:
     name: Terbitkan ke GitHub Pages
-    needs: [rust, security, web, conform]
+    needs: [rust, security, web, conform, oracle]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:

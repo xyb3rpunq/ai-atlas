@@ -8,21 +8,201 @@
 
 import * as engine from "../engine.js";
 import { T, bi, pick } from "../i18n.js";
-import { buttonRow, card, clear, el, errorNote, slider, table } from "../ui.js";
-import type { Lab } from "./registry.js";
+import { buttonRow, card, clear, el, errorNote, fmt, slider, table } from "../ui.js";
+import { canvasSvg, cycle, figure, rankedBars, svg, svgText } from "../viz.js";
+
+/**
+ * Deretan pasangan teko beserta tinggi airnya di tiap langkah.
+ *
+ * Isi teko adalah besaran yang paling mudah dibaca sebagai tinggi, dan justru
+ * di situlah polanya terlihat: penyelesaian teko air selalu berupa satu teko
+ * yang berulang kali penuh lalu dituang, sementara yang lain menampung sisanya.
+ * Tabel angka memuat data yang sama tetapi menyembunyikan polanya.
+ */
+function stripTeko(
+  langkah: engine.JugStep[],
+  kapA: number,
+  kapB: number,
+  sasaran: number,
+): SVGSVGElement {
+  const kolom = 46;
+  const tinggi = 74;
+  const W = Math.max(240, langkah.length * kolom + 30);
+  const H = tinggi + 44;
+  const root = canvasSvg(W, H);
+
+  langkah.forEach((s, i) => {
+    const x = 16 + i * kolom;
+    const gambarTeko = (dx: number, isi: number, kap: number): void => {
+      const h = kap === 0 ? 0 : (isi / kap) * tinggi;
+      root.append(
+        svg("rect", {
+          x: x + dx,
+          y: 8,
+          width: 15,
+          height: tinggi,
+          rx: 3,
+          fill: "none",
+          stroke: "var(--border-strong)",
+        }),
+        svg("rect", {
+          x: x + dx,
+          y: 8 + tinggi - h,
+          width: 15,
+          height: h,
+          rx: 3,
+          // Teko yang isinya persis sasaran diberi warna aksen, sehingga
+          // langkah tempat masalahnya selesai langsung terlihat.
+          fill: isi === sasaran && isi > 0 ? "var(--accent)" : "var(--text-faint)",
+          opacity: isi === sasaran && isi > 0 ? 0.85 : 0.5,
+        }),
+      );
+    };
+    gambarTeko(0, s.a, kapA);
+    gambarTeko(19, s.b, kapB);
+    root.append(
+      svgText(x + 17, tinggi + 22, `${s.a}/${s.b}`, {
+        "text-anchor": "middle",
+        "font-size": 9,
+        "font-family": "var(--font-mono)",
+      }),
+      svgText(x + 17, tinggi + 34, String(i + 1), {
+        "text-anchor": "middle",
+        "font-size": 8,
+        fill: "var(--text-faint)",
+      }),
+    );
+  });
+  return root;
+}
+
+/**
+ * Kedua tepi sungai di tiap langkah, beserta letak perahunya.
+ *
+ * Aturan keselamatannya menyangkut perbandingan jumlah di satu tepi, dan
+ * perbandingan jauh lebih mudah dilihat daripada dibaca. Sebuah langkah yang
+ * hampir melanggar aturan langsung tampak sebagai dua tumpukan yang nyaris
+ * sama tinggi.
+ */
+function stripSungai(
+  langkah: engine.CrossingStep[],
+  totalM: number,
+  totalK: number,
+): SVGSVGElement {
+  const kolom = 52;
+  const W = Math.max(260, langkah.length * kolom + 30);
+  const H = 128;
+  const root = canvasSvg(W, H);
+  const titik = 9;
+
+  langkah.forEach((s, i) => {
+    const x = 16 + i * kolom;
+    const gambarTepi = (y: number, m: number, k: number): void => {
+      for (let j = 0; j < m; j += 1) {
+        root.append(
+          svg("circle", { cx: x + 6 + j * titik, cy: y, r: 3.4, fill: "var(--accent)" }),
+        );
+      }
+      for (let j = 0; j < k; j += 1) {
+        root.append(
+          svg("rect", {
+            x: x + 3 + j * titik,
+            y: y + 8,
+            width: 6.8,
+            height: 6.8,
+            fill: "var(--warn)",
+          }),
+        );
+      }
+    };
+    gambarTepi(16, s.missionaries_left, s.cannibals_left);
+    gambarTepi(78, totalM - s.missionaries_left, totalK - s.cannibals_left);
+
+    root.append(
+      svg("line", {
+        x1: x,
+        y1: 62,
+        x2: x + kolom - 8,
+        y2: 62,
+        stroke: "var(--border-strong)",
+        "stroke-dasharray": "2 3",
+      }),
+      // Perahu digambar menempel di tepi tempat ia berada; itulah satu-satunya
+      // hal yang membatasi langkah berikutnya.
+      svg("path", {
+        d: `M ${x + 4} ${s.boat_left ? 56 : 68} h 18 l -3 6 h -12 Z`,
+        fill: "var(--text-muted)",
+      }),
+      svgText(x + kolom / 2 - 4, H - 6, String(i + 1), {
+        "text-anchor": "middle",
+        "font-size": 8,
+        fill: "var(--text-faint)",
+      }),
+    );
+  });
+  return root;
+}
+
+/**
+ * Deretan ruangan beserta letak agen dan kotoran yang tersisa.
+ *
+ * Dunia penyedot debu cukup kecil untuk digambar seluruhnya, dan menggambarnya
+ * seluruhnya jauh lebih jelas daripada menuliskan "posisi 3, kotor di 0 dan 4".
+ * Pembaca tidak perlu menyusun ulang gambarnya di kepala.
+ */
+function stripDunia(kotor: boolean[], posisi: number): SVGSVGElement {
+  const kotak = 54;
+  const W = Math.max(200, kotor.length * kotak + 20);
+  const H = 96;
+  const root = canvasSvg(W, H);
+
+  kotor.forEach((isiKotor, i) => {
+    const x = 10 + i * kotak;
+    root.append(
+      svg("rect", {
+        x,
+        y: 26,
+        width: kotak - 6,
+        height: kotak - 6,
+        rx: 7,
+        fill: isiKotor ? "var(--warn)" : "var(--surface-2)",
+        opacity: isiKotor ? 0.32 : 1,
+        stroke: i === posisi ? "var(--accent)" : "var(--border-strong)",
+        "stroke-width": i === posisi ? 2.5 : 1,
+      }),
+      svgText(x + (kotak - 6) / 2, 50, isiKotor ? "•••" : "", {
+        "text-anchor": "middle",
+        "font-size": 14,
+        fill: "var(--warn)",
+      }),
+      svgText(x + (kotak - 6) / 2, 88, String(i), {
+        "text-anchor": "middle",
+        "font-size": 10,
+      }),
+    );
+    if (i === posisi) {
+      root.append(
+        svgText(x + (kotak - 6) / 2, 18, "▼", {
+          "text-anchor": "middle",
+          "font-size": 12,
+          fill: "var(--accent)",
+        }),
+      );
+    }
+  });
+  return root;
+}
 
 type Tab = "vacuum" | "jug" | "missionaries";
 
-export const agentLab: Lab = {
-  slug: "agents",
-  session: 2,
-  title: bi("Agen Cerdas & Ruang Keadaan", "Agents & State Space"),
-  blurb: bi(
-    "Empat jenis agen pada dunia yang sama. Yang membedakannya bukan kecanggihan, melainkan seberapa banyak yang mereka ingat: agen tanpa ingatan tidak punya cara mengetahui bahwa pekerjaannya sudah selesai, jadi ia terus bergerak sampai dihentikan paksa.",
-    "Four kinds of agent on one world. What separates them is not sophistication but how much they remember: an agent without memory has no way to know its work is done, so it keeps moving until forced to stop.",
-  ),
-
-  mount(root: HTMLElement): () => void {
+/**
+ * Memasang laboratorium ke dalam elemen yang diberikan.
+ *
+ * Keterangannya -- judul, nomor sesi, penjelasan -- ada di
+ * `labs/registry.ts`, bukan di sini, supaya daftar isi bisa ditampilkan
+ * tanpa mengunduh mesin seluruh laboratorium lebih dulu.
+ */
+export function mount(root: HTMLElement): () => void {
     let tab: Tab = "vacuum";
     let dirty = [true, false, true, false, true];
     let position = 0;
@@ -53,7 +233,87 @@ export const agentLab: Lab = {
         utility_based: bi("Berbasis utilitas", "Utility-based"),
       };
 
+      // Contoh satu putaran diambil dari langkah pertama agen berbasis tujuan:
+      // ia satu-satunya yang keempat tahapnya benar-benar terisi.
+      const contoh = runs.find((r) => r.kind === "goal_based")?.steps[0];
+
       output.append(
+        card(
+          pick(bi("Dunia yang dihadapi", "The world being faced")),
+          figure({
+            title: bi("Peta ruangan", "Room map"),
+            summary: bi(
+              `${dirty.filter(Boolean).length} dari ${dirty.length} ruangan kotor. ` +
+                `Segitiga menandai posisi awal agen. Setiap agen di bawah menghadapi ` +
+                `dunia yang sama persis ini, jadi selisih angkanya sepenuhnya berasal ` +
+                `dari cara mereka memutuskan, bukan dari keberuntungan.`,
+              `${dirty.filter(Boolean).length} of ${dirty.length} rooms are dirty. ` +
+                `The triangle marks the agent's starting position. Every agent below faces ` +
+                `exactly this world, so any difference in the numbers comes entirely from ` +
+                `how they decide, not from luck.`,
+            ),
+            body: stripDunia(dirty, position),
+            legend: [
+              { color: "var(--warn)", label: bi("ruangan kotor", "dirty room") },
+              { color: "var(--accent)", label: bi("posisi agen", "agent position") },
+            ],
+          }),
+        ),
+        ...(contoh
+          ? [card(
+              pick(bi("Satu putaran agen", "One agent cycle")),
+              figure({
+                title: bi("Gelang indera–putus–tindak", "Sense–decide–act loop"),
+                summary: bi(
+                  "Agen bukan fungsi yang dipanggil sekali, melainkan gelang yang berputar: " +
+                    "tindakannya mengubah lingkungan, dan lingkungan yang sudah berubah itulah " +
+                    "yang diinderanya pada putaran berikutnya. Angka di sini diambil dari " +
+                    "putaran pertama agen berbasis tujuan.",
+                  "An agent is not a function called once but a loop: its action changes the " +
+                    "environment, and that changed environment is what it senses on the next " +
+                    "turn. The values shown come from the goal-based agent's first cycle.",
+                ),
+                body: cycle(
+                  [
+                    { label: bi("Indera", "Percept"), value: contoh.perceived_dirty ? "kotor" : "bersih" },
+                    { label: bi("Keadaan", "State"), value: `${pick(bi("ruang", "room"))} ${contoh.position}` },
+                    { label: bi("Tindakan", "Action"), value: contoh.action },
+                    { label: bi("Lingkungan", "Environment"), value: `${contoh.dirty_after} ${pick(bi("kotor", "dirty"))}` },
+                  ],
+                  0,
+                ),
+              }),
+            )]
+          : []),
+        card(
+          pick(bi("Biaya yang dibayar tiap agen", "What each agent pays")),
+          figure({
+            title: bi("Biaya dan gerak sia-sia", "Cost and wasted moves"),
+            summary: bi(
+              "Batang atas adalah biaya total tiap agen pada dunia yang sama. " +
+                "Agen refleks sederhana hampir selalu paling boros, dan bukan karena " +
+                "aturannya buruk: tanpa ingatan ia tidak punya cara mengetahui bahwa " +
+                "pekerjaannya sudah selesai, jadi ia terus bergerak sampai dihentikan paksa.",
+              "Each bar is one agent's total cost on the same world. The simple reflex agent " +
+                "is almost always the most wasteful, and not because its rules are bad: with " +
+                "no memory it has no way to know its work is done, so it keeps moving until " +
+                "forced to stop.",
+            ),
+            body: rankedBars(
+              runs.map((r) => ({
+                label: pick(nama[r.kind] ?? bi(r.kind, r.kind)),
+                value: r.cost,
+                highlight: r.cost === Math.min(...runs.map((x) => x.cost)),
+                detail: `${r.wasted_moves} ${pick(bi("sia-sia", "wasted"))}`,
+              })),
+              (v) => fmt(v, 0),
+            ),
+            legend: [
+              { color: "var(--accent)", label: bi("paling hemat", "cheapest") },
+              { color: "var(--text-faint)", label: bi("lainnya", "others") },
+            ],
+          }),
+        ),
         card(
           pick(bi("Empat agen, satu dunia", "Four agents, one world")),
           table(
@@ -146,6 +406,31 @@ export const agentLab: Lab = {
       }
 
       output.append(
+        ...(steps.length > 0
+          ? [
+              card(
+                pick(bi("Isi teko di tiap langkah", "Jug levels at each step")),
+                figure({
+                  title: bi("Tinggi air kedua teko", "Water level in both jugs"),
+                  summary: bi(
+                    `${steps.length} langkah membawa teko dari kosong ke sasaran ${jugTarget} liter. ` +
+                      `Batang tersorot adalah teko yang isinya persis sasaran. Perhatikan polanya: ` +
+                      `satu teko berulang kali diisi penuh lalu dituang, dan sisa yang tak tertampung ` +
+                      `itulah yang perlahan menyusun jawabannya.`,
+                    `${steps.length} steps take the jugs from empty to the ${jugTarget}-litre target. ` +
+                      `The highlighted bar is the jug holding exactly the target. Watch the pattern: ` +
+                      `one jug is filled and poured out again and again, and the remainder that will ` +
+                      `not fit is what slowly builds the answer.`,
+                  ),
+                  body: stripTeko(steps, jugA, jugB, jugTarget),
+                  legend: [
+                    { color: "var(--accent)", label: bi("isi sama dengan sasaran", "level equals target") },
+                    { color: "var(--text-faint)", label: bi("isi lain", "other levels") },
+                  ],
+                }),
+              ),
+            ]
+          : []),
         card(
           pick(T.result),
           steps.length > 0
@@ -201,6 +486,29 @@ export const agentLab: Lab = {
       }
 
       output.append(
+        card(
+          pick(bi("Kedua tepi di tiap langkah", "Both banks at each step")),
+          figure({
+            title: bi("Peta penyeberangan", "Crossing map"),
+            summary: bi(
+              `Tepi kiri di atas garis, tepi kanan di bawahnya, perahu menempel di tepi ` +
+                `tempatnya berada. Aturan keselamatannya menyangkut perbandingan jumlah di ` +
+                `satu tepi, jadi yang layak diperhatikan bukan langkah mana yang aman ` +
+                `melainkan seberapa tipis jaraknya: penyelesaian ${steps.length} langkah ini ` +
+                `berkali-kali berjalan tepat di batas.`,
+              `The left bank is above the line, the right bank below it, and the boat sits on ` +
+                `whichever side it is moored. The safety rule is about the ratio on one bank, so ` +
+                `what matters is not which steps are safe but how narrow the margin is: this ` +
+                `${steps.length}-step solution repeatedly runs right along the edge.`,
+            ),
+            body: stripSungai(steps, missionaries, cannibals),
+            legend: [
+              { color: "var(--accent)", label: bi("misionaris", "missionary") },
+              { color: "var(--warn)", label: bi("kanibal", "cannibal") },
+              { color: "var(--text-muted)", label: bi("perahu", "boat") },
+            ],
+          }),
+        ),
         card(
           pick(T.result),
           table(
@@ -457,5 +765,4 @@ export const agentLab: Lab = {
     return () => {
       clear(root);
     };
-  },
-};
+}

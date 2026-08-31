@@ -51,6 +51,24 @@ pub enum Comparability {
     /// pelatihan berlangkah besar, selisih satu ULP pada `tanh` membesar
     /// menjadi hasil akhir yang sama sekali berbeda.
     NearlyEqual(u64),
+    /// Hasilnya adalah selisih dua besaran yang hampir sama besar, sehingga
+    /// toleransinya harus diukur pada skala kedua besaran itu — bukan pada
+    /// hasilnya.
+    ///
+    /// Perolehan informasi adalah contohnya: `gain = H(sebelum) - H(sesudah)`
+    /// dengan `H(sebelum)` sekitar 0,94 dan `H(sesudah)` sekitar 0,91. Galat
+    /// dua ULP pada `H` — yang wajar, karena `log2` bukan operasi yang
+    /// dibulatkan dengan benar menurut IEEE-754 — bernilai mutlak sekitar
+    /// 2,2e-16. Pada hasil sebesar 0,029 nilai itu sama dengan 64 ULP.
+    ///
+    /// Menuntut [`Comparability::NearlyEqual`] di sini berarti menuntut
+    /// implementasi `log2` yang lebih teliti daripada yang diwajibkan standar.
+    /// Yang benar adalah menyatakan toleransinya pada tempat aritmetikanya
+    /// terjadi: `|a - b| <= n x ulp(skala)`.
+    ///
+    /// Diukur pada dataset tenis: selisih Rust lawan PL/SQL paling besar
+    /// 2 ULP pada skalanya, jauh di dalam batas 4 yang dipakai.
+    CancellingDifference(u64),
     /// Hanya sifatnya yang bisa dituntut, bukan angkanya.
     ///
     /// Berlaku untuk perhitungan yang berperilaku kacau, seperti pelatihan
@@ -74,7 +92,32 @@ impl Comparability {
                 // Tak hingga yang berlawanan tanda, atau satu NaN satu bukan.
                 None => bit_equal(a, b),
             },
+            // Tingkat ini menuntut skala, dan skalanya tidak ada di sini.
+            // Yang dikembalikan adalah pemeriksaan paling ketat, bukan paling
+            // longgar: pemanggil yang lupa memberi skala akan melihat
+            // kegagalan, bukan kelolosan palsu.
+            Comparability::CancellingDifference(_) => bit_equal(a, b),
             Comparability::PropertyOnly => true,
+        }
+    }
+
+    /// Seperti [`Comparability::holds`], tetapi menyertakan skala tempat
+    /// aritmetikanya terjadi.
+    ///
+    /// Hanya [`Comparability::CancellingDifference`] yang memakai `scale`;
+    /// tingkat lain mengabaikannya.
+    pub fn holds_scaled(self, a: f64, b: f64, scale: f64) -> bool {
+        match self {
+            Comparability::CancellingDifference(max_ulp) => {
+                if bit_equal(a, b) {
+                    return true;
+                }
+                if !a.is_finite() || !b.is_finite() || !scale.is_finite() {
+                    return false;
+                }
+                (a - b).abs() <= max_ulp as f64 * ulp_step(scale)
+            }
+            _ => self.holds(a, b),
         }
     }
 
@@ -83,6 +126,7 @@ impl Comparability {
         match self {
             Comparability::BitExact => "wajib identik bit demi bit",
             Comparability::NearlyEqual(_) => "boleh berbeda beberapa ULP",
+            Comparability::CancellingDifference(_) => "beberapa ULP diukur pada skala masukannya",
             Comparability::PropertyOnly => "hanya sifatnya yang diuji",
         }
     }
@@ -182,6 +226,33 @@ pub fn ulp_distance(a: f64, b: f64) -> Option<u64> {
     Some(key(a).abs_diff(key(b)))
 }
 
+/// Jarak antara `x` dan bilangan `f64` terdekat berikutnya yang lebih besar
+/// nilai mutlaknya.
+///
+/// Dipakai untuk menyatakan toleransi pada skala tertentu, bukan pada hasil
+/// akhirnya. Lihat [`Comparability::CancellingDifference`].
+///
+/// ```
+/// use ai_core::fx::ulp_step;
+/// assert_eq!(ulp_step(1.0), f64::EPSILON);
+/// // Nol tidak punya "ULP" yang bermakna, jadi dipakai bilangan subnormal
+/// // terkecil — langkah sesungguhnya dari nol ke bilangan berikutnya.
+/// assert_eq!(ulp_step(0.0), f64::from_bits(1));
+/// ```
+///
+/// Mengembalikan `NaN` untuk masukan yang tidak berhingga, dan tak hingga
+/// untuk [`f64::MAX`] karena bilangan berikutnya memang sudah tak hingga.
+pub fn ulp_step(x: f64) -> f64 {
+    if !x.is_finite() {
+        return f64::NAN;
+    }
+    let a = x.abs();
+    if a == 0.0 {
+        return f64::from_bits(1);
+    }
+    f64::from_bits(a.to_bits() + 1) - a
+}
+
 /// Apakah dua nilai sama persis pada tingkat bit, dengan `NaN` dianggap sama.
 ///
 /// Perbandingan `==` biasa menyatakan `NaN != NaN`, padahal untuk membandingkan
@@ -196,6 +267,50 @@ pub fn bit_equal(a: f64, b: f64) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn langkah_ulp_sepadan_dengan_epsilon() {
+        assert_eq!(ulp_step(1.0), f64::EPSILON);
+        assert_eq!(ulp_step(-1.0), f64::EPSILON);
+        assert_eq!(ulp_step(0.0), f64::from_bits(1));
+        assert_eq!(ulp_step(-0.0), f64::from_bits(1));
+        assert!(ulp_step(f64::NAN).is_nan());
+        assert!(ulp_step(f64::INFINITY).is_nan());
+    }
+
+    #[test]
+    fn langkah_ulp_membesar_bersama_nilainya() {
+        // Satu ULP pada 1024 seribu kali lebih besar daripada pada 1. Justru
+        // inilah alasan toleransi ULP harus disebut skalanya.
+        assert!(ulp_step(1024.0) > ulp_step(1.0) * 1000.0);
+    }
+
+    #[test]
+    fn selisih_yang_saling_meniadakan_diukur_pada_skalanya() {
+        let tingkat = Comparability::CancellingDifference(4);
+        let skala = 0.9402859586706311_f64;
+        // Galat dua ULP pada skalanya.
+        let galat = 2.0 * ulp_step(skala);
+        let a = 0.02922256565895487_f64;
+        let b = a + galat;
+        assert!(tingkat.holds_scaled(a, b, skala));
+        // Pada hasil sekecil itu, galat yang sama berjarak puluhan ULP,
+        // sehingga tingkat NearlyEqual(4) menolaknya.
+        assert!(!Comparability::NearlyEqual(4).holds(a, b));
+        // Lima ULP pada skalanya sudah di luar batas.
+        assert!(!tingkat.holds_scaled(a, a + 5.0 * ulp_step(skala), skala));
+    }
+
+    #[test]
+    fn selisih_tanpa_skala_dinilai_paling_ketat() {
+        // Lupa memberi skala harus berujung kegagalan, bukan kelolosan palsu.
+        let tingkat = Comparability::CancellingDifference(4);
+        assert!(tingkat.holds(1.0, 1.0));
+        assert!(!tingkat.holds(1.0, 1.0 + f64::EPSILON));
+        assert!(!tingkat.holds_scaled(1.0, 2.0, f64::NAN));
+        assert!(!tingkat.holds_scaled(1.0, 2.0, f64::INFINITY));
+        assert!(!tingkat.describe().is_empty());
+    }
 
     #[test]
     fn hex_nilai_yang_dikenal() {

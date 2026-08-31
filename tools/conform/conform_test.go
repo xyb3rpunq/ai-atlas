@@ -269,3 +269,45 @@ func TestSeluruhVektorSungguhanCocok(t *testing.T) {
 	}
 	t.Logf("%d vektor cocok antara Rust dan Go", totalDiperiksa)
 }
+
+func TestTingkatBerskalaMengukurPadaSkalanya(t *testing.T) {
+	k, err := BacaKeterbandingan("CancellingDifference(4)")
+	if err != nil {
+		t.Fatalf("tingkat tidak terbaca: %v", err)
+	}
+	if !k.PakaiSkala {
+		t.Fatal("tingkat CancellingDifference harus menuntut skala")
+	}
+
+	const skala = 0.9402859586706311
+	const a = 0.02922256565895487
+	b := a + 2*aicore.LangkahUlp(skala)
+
+	if !k.TerpenuhiSkala(a, b, skala) {
+		t.Error("dua ULP pada skalanya seharusnya lolos")
+	}
+	if k.TerpenuhiSkala(a, a+5*aicore.LangkahUlp(skala), skala) {
+		t.Error("lima ULP pada skalanya seharusnya gagal")
+	}
+	// Galat yang sama berjarak puluhan ULP kalau diukur pada hasilnya.
+	nearly, _ := BacaKeterbandingan("NearlyEqual(4)")
+	if nearly.Terpenuhi(a, b) {
+		t.Error("tingkat tanpa skala seharusnya menolak selisih ini")
+	}
+	// Lupa memberi skala harus berujung kegagalan, bukan kelolosan palsu.
+	if k.Terpenuhi(a, b) {
+		t.Error("tingkat berskala tanpa skala seharusnya menolak")
+	}
+	if math.IsNaN(aicore.LangkahUlp(1.0)) || aicore.LangkahUlp(1.0) != math.Nextafter(1, 2)-1 {
+		t.Error("LangkahUlp(1) harus sama dengan jarak ke float64 berikutnya")
+	}
+}
+
+func TestTingkatTakDikenalDitolak(t *testing.T) {
+	if _, err := BacaKeterbandingan("CancellingDifference"); err == nil {
+		t.Error("tingkat tanpa angka seharusnya ditolak")
+	}
+	if _, err := BacaKeterbandingan("Kira-kira sama"); err == nil {
+		t.Error("tingkat karangan seharusnya ditolak")
+	}
+}

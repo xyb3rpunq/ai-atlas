@@ -13,7 +13,7 @@
 import * as engine from "../engine.js";
 import { bi, pick } from "../i18n.js";
 import { buttonRow, card, clear, el, errorNote, table } from "../ui.js";
-import type { Lab } from "./registry.js";
+import { figure, pipeline, rankedBars } from "../viz.js";
 
 /** Satu giliran percakapan. */
 interface Turn {
@@ -31,16 +31,14 @@ const SUGGESTIONS = [
   "Cuaca hari ini cerah sekali",
 ];
 
-export const elizaLab: Lab = {
-  slug: "eliza",
-  session: 1,
-  title: bi("Pengantar Kecerdasan Buatan", "Introduction to AI"),
-  blurb: bi(
-    "ELIZA tidak memahami apa pun. Ia mencocokkan kata kunci, menukar kata ganti, dan memantulkan kalimat Anda kembali sebagai pertanyaan — namun orang yang memakainya pada 1966 meminta ditinggal berdua dengannya. Di sini mesinnya dibiarkan terbuka, supaya jarak antara kesederhanaannya dan kesan yang ditimbulkannya terlihat.",
-    "ELIZA understands nothing. It matches keywords, swaps pronouns, and reflects your sentence back as a question — yet people in 1966 asked to be left alone with it. Here the machinery is left open, so the gap between how simple it is and how convincing it feels becomes visible.",
-  ),
-
-  mount(root: HTMLElement): () => void {
+/**
+ * Memasang laboratorium ke dalam elemen yang diberikan.
+ *
+ * Keterangannya -- judul, nomor sesi, penjelasan -- ada di
+ * `labs/registry.ts`, bukan di sini, supaya daftar isi bisa ditampilkan
+ * tanpa mengunduh mesin seluruh laboratorium lebih dulu.
+ */
+export function mount(root: HTMLElement): () => void {
     let turns: Turn[] = [];
     let seed = 1;
 
@@ -91,10 +89,63 @@ export const elizaLab: Lab = {
           ),
         );
 
-        const terakhir = turns[turns.length - 1].reply;
+        const terakhirGiliran = turns[turns.length - 1];
+        const terakhir = terakhirGiliran.reply;
         output.append(
           card(
             pick(bi("Bagaimana balasan terakhir dibuat", "How the last reply was made")),
+            figure({
+              title: bi("Empat tahap dari kalimat ke balasan", "Four stages from sentence to reply"),
+              summary: terakhir.used_fallback
+                ? bi(
+                    "Tahap pencocokan gagal, jadi tiga tahap sisanya dilewati dan ELIZA " +
+                      "mengambil kalimat cadangan begitu saja. Kalimat cadangan inilah yang " +
+                      "paling sering terasa mendalam — padahal ia sama sekali tidak melihat " +
+                      "apa yang Anda tulis.",
+                    "The matching stage failed, so the remaining three stages were skipped and " +
+                      "ELIZA simply took a stock line. Those stock lines are what most often feel " +
+                      "profound — even though they never looked at what you wrote.",
+                  )
+                : bi(
+                    `Kalimat Anda dicocokkan dengan kata kunci "${terakhir.matched_keyword}" ` +
+                      `berkeutamaan ${terakhir.priority}, potongannya diambil, kata gantinya ` +
+                      `ditukar, lalu dimasukkan ke templat. Tidak ada tahap yang memahami apa pun; ` +
+                      `seluruhnya hanya pencocokan pola dan penukaran kata.`,
+                    `Your sentence matched the keyword "${terakhir.matched_keyword}" with priority ` +
+                      `${terakhir.priority}, a fragment was taken, its pronouns were swapped, and ` +
+                      `the result was slotted into a template. No stage understands anything; it is ` +
+                      `all pattern matching and word substitution.`,
+                  ),
+              body: pipeline([
+                {
+                  label: bi("Masukan", "Input"),
+                  value: terakhirGiliran.user,
+                },
+                {
+                  label: bi("Cocokkan kata kunci", "Match keyword"),
+                  value: terakhir.matched_keyword || pick(bi("tidak ada yang cocok", "no match")),
+                  note: terakhir.used_fallback
+                    ? undefined
+                    : pick(bi(`keutamaan ${terakhir.priority}`, `priority ${terakhir.priority}`)),
+                  skipped: terakhir.used_fallback,
+                },
+                {
+                  label: bi("Pantulkan potongan", "Reflect fragment"),
+                  value: terakhir.reflected_fragment || "—",
+                  note: pick(bi("kata ganti ditukar", "pronouns swapped")),
+                  skipped: terakhir.used_fallback || terakhir.reflected_fragment.length === 0,
+                },
+                {
+                  label: bi("Susun balasan", "Assemble reply"),
+                  value: terakhir.text,
+                  note: pick(
+                    terakhir.used_fallback
+                      ? bi("dari daftar cadangan", "from the fallback list")
+                      : bi("dari templat aturan", "from the rule template"),
+                  ),
+                },
+              ]),
+            }),
             table(
               [pick(bi("Tahap", "Stage")), pick(bi("Hasil", "Result"))],
               [
@@ -168,6 +219,30 @@ export const elizaLab: Lab = {
         ),
         card(
           pick(bi("Aturan dan keutamaannya", "Rules and priorities")),
+          figure({
+            title: bi("Urutan keutamaan aturan", "Rule priority order"),
+            summary: bi(
+              `Aturan berkeutamaan lebih tinggi diperiksa lebih dulu dan menang. ` +
+                `Itulah satu-satunya "penalaran" yang dimiliki ELIZA: ${script.rules.length} angka ` +
+                `yang menentukan siapa mengalahkan siapa. Tanpa penomoran ini, aturan paling ` +
+                `umum akan selalu menang dan percakapannya langsung terasa hambar.`,
+              `Higher-priority rules are checked first and win. That is the whole of ELIZA's ` +
+                `"reasoning": ${script.rules.length} numbers deciding who beats whom. Without them, ` +
+                `the most general rule would always win and the conversation would fall flat.`,
+            ),
+            body: rankedBars(
+              script.rules
+                .slice()
+                .sort((a, b) => b.priority - a.priority)
+                .map((r, i) => ({
+                  label: r.keyword,
+                  value: r.priority,
+                  highlight: i === 0,
+                  detail: `${r.responses.length} ${pick(bi("balasan", "replies"))}`,
+                })),
+              (v) => String(v),
+            ),
+          }),
           table(
             [
               pick(bi("Kata kunci", "Keyword")),
@@ -259,5 +334,4 @@ export const elizaLab: Lab = {
     return () => {
       clear(root);
     };
-  },
-};
+}

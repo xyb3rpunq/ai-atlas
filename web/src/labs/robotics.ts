@@ -15,20 +15,17 @@
 import * as engine from "../engine.js";
 import { T, bi, pick } from "../i18n.js";
 import { buttonRow, card, clear, el, errorNote, fmt, slider, table } from "../ui.js";
-import type { Lab } from "./registry.js";
 
 type Tab = "pid" | "arm" | "path";
 
-export const roboticsLab: Lab = {
-  slug: "robotics",
-  session: 14,
-  title: bi("Robotika", "Robotics"),
-  blurb: bi(
-    "Kendali PID, kinematika lengan, dan perencanaan lintasan. Yang paling banyak mengajarkan sesuatu di sini justru kegagalannya: penguatan yang salah membuat sistem berayun, dan medan potensial punya cacat bawaan yang membuat robot berhenti di depan rintangan padahal tujuannya terlihat jelas.",
-    "PID control, arm kinematics, and path planning. What teaches most here is the failure modes: the wrong gains make a system oscillate, and potential fields have a built-in flaw that stalls the robot in front of an obstacle while the goal is in plain sight.",
-  ),
-
-  mount(root: HTMLElement): () => void {
+/**
+ * Memasang laboratorium ke dalam elemen yang diberikan.
+ *
+ * Keterangannya -- judul, nomor sesi, penjelasan -- ada di
+ * `labs/registry.ts`, bukan di sini, supaya daftar isi bisa ditampilkan
+ * tanpa mengunduh mesin seluruh laboratorium lebih dulu.
+ */
+export function mount(root: HTMLElement): () => void {
     let tab: Tab = "pid";
     let kp = 1.2;
     let ki = 0.4;
@@ -545,5 +542,4 @@ export const roboticsLab: Lab = {
       observer.disconnect();
       clear(root);
     };
-  },
-};
+}

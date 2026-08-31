@@ -15,7 +15,8 @@
 import * as engine from "../engine.js";
 import { T, bi, pick } from "../i18n.js";
 import { buttonRow, card, clear, el, errorNote, fmt, slider, table } from "../ui.js";
-import type { Lab } from "./registry.js";
+import { figure, heatmap, pipeline as vizPipeline, rankedBars } from "../viz.js";
+import type { Stage } from "../viz.js";
 
 type Tab = "pipeline" | "stem" | "tfidf" | "similarity";
 
@@ -39,16 +40,14 @@ const SAMPLE_WORDS = [
   "bukumu",
 ];
 
-export const nlpLab: Lab = {
-  slug: "nlp",
-  session: 10,
-  title: bi("Pemrosesan Bahasa Alami", "Natural Language Processing"),
-  blurb: bi(
-    "Teks Bahasa Indonesia diproses tahap demi tahap, dan tiap tahap diperlihatkan apa adanya. Perhatikan pencarian kata dasarnya: sebagian awalan meluluhkan huruf pertama kata dasarnya, sehingga algoritma untuk Bahasa Inggris tidak bisa dipakai begitu saja.",
-    "Indonesian text processed stage by stage, with every stage shown as it is. Watch the stemmer in particular: some prefixes dissolve the first letter of the root, so an English algorithm cannot simply be reused.",
-  ),
-
-  mount(root: HTMLElement): () => void {
+/**
+ * Memasang laboratorium ke dalam elemen yang diberikan.
+ *
+ * Keterangannya -- judul, nomor sesi, penjelasan -- ada di
+ * `labs/registry.ts`, bukan di sini, supaya daftar isi bisa ditampilkan
+ * tanpa mengunduh mesin seluruh laboratorium lebih dulu.
+ */
+export function mount(root: HTMLElement): () => void {
     let tab: Tab = "pipeline";
     let text = SAMPLE_TEXT;
     let removeStopwords = true;
@@ -81,6 +80,77 @@ export const nlpLab: Lab = {
       output.append(
         card(
           pick(bi("Tahap demi tahap", "Stage by stage")),
+          figure({
+            title: bi("Penyusutan teks di tiap tahap", "How the text shrinks at each stage"),
+            summary: bi(
+              `Teks masuk sebagai ${result.sentences.length} kalimat dan keluar sebagai ` +
+                `${result.final_tokens.length} kata dasar. Tiap tahap membuang sesuatu, dan ` +
+                `yang dibuang tidak pernah kembali — itulah sebabnya urutannya menentukan: ` +
+                `membuang kata henti sebelum mencari kata dasar memberi hasil berbeda dari ` +
+                `sesudahnya.`,
+              `The text enters as ${result.sentences.length} sentence(s) and leaves as ` +
+                `${result.final_tokens.length} stems. Each stage discards something, and what is ` +
+                `discarded never comes back — which is why the order matters: removing stopwords ` +
+                `before stemming gives a different result than after.`,
+            ),
+            body: vizPipeline([
+              {
+                label: bi("Kalimat", "Sentences"),
+                value: result.sentences.join(" | ").slice(0, 62) || "—",
+                note: pick(bi(`${result.sentences.length} kalimat`, `${result.sentences.length} sentence(s)`)),
+              },
+              {
+                label: bi("Token", "Tokens"),
+                value: result.tokens.join(" · ").slice(0, 62) || "—",
+                note: pick(bi(`${result.tokens.length} token`, `${result.tokens.length} tokens`)),
+              },
+              {
+                label: bi("Buang kata henti", "Remove stopwords"),
+                value: result.after_stopwords.join(" · ").slice(0, 62) || "—",
+                note: pick(bi(`${removed} kata dibuang`, `${removed} words dropped`)),
+                skipped: !removeStopwords,
+              },
+              {
+                label: bi("Cari kata dasar", "Stem"),
+                value: result.final_tokens.join(" · ").slice(0, 62) || "—",
+                note: pick(
+                  bi(
+                    `${result.stems.filter((s) => s.original !== s.stem).length} kata dikupas`,
+                    `${result.stems.filter((s) => s.original !== s.stem).length} words stripped`,
+                  ),
+                ),
+                skipped: !stem,
+              },
+            ]),
+          }),
+          figure({
+            title: bi("Berapa yang tersisa di tiap tahap", "How much survives each stage"),
+            summary: bi(
+              "Batang yang memendek tajam adalah tahap yang paling banyak membuang. " +
+                "Tahap seperti itu paling berkuasa sekaligus paling berbahaya: satu kata henti " +
+                'yang salah masuk daftar — misalnya "tidak" — sudah cukup untuk membalik makna ' +
+                "seluruh kalimat tanpa satu pun galat muncul.",
+              "A bar that drops sharply marks the stage that discards the most. Such stages are " +
+                'the most powerful and the most dangerous: one wrong entry in the stopword list — ' +
+                '"not", say — is enough to reverse a whole sentence\'s meaning without a single ' +
+                "error appearing anywhere.",
+            ),
+            body: rankedBars(
+              [
+                { label: pick(bi("Token mentah", "Raw tokens")), value: result.tokens.length },
+                {
+                  label: pick(bi("Tanpa kata henti", "After stopwords")),
+                  value: result.after_stopwords.length,
+                },
+                {
+                  label: pick(bi("Kata dasar akhir", "Final stems")),
+                  value: result.final_tokens.length,
+                  highlight: true,
+                },
+              ],
+              (v) => String(Math.round(v)),
+            ),
+          }),
           table(
             [
               pick(bi("Tahap", "Stage")),
@@ -201,7 +271,82 @@ export const nlpLab: Lab = {
       }
     }
 
+    /**
+     * Menyusun alur pengupasan satu kata menjadi tahap-tahap yang terlihat.
+     *
+     * Tahap pemeriksaan kamus selalu ditampilkan, termasuk ketika ia yang
+     * menghentikan pengupasan. Justru tahap itulah yang membedakan pencari
+     * kata dasar Bahasa Indonesia dari yang Bahasa Inggris, dan tahap yang
+     * tidak terlihat tidak akan dipelajari siapa pun.
+     */
+    function tahapStem(r: engine.StemResult): Stage[] {
+      const tahap: Stage[] = [
+        {
+          label: bi("Kata masukan", "Input word"),
+          value: r.original,
+        },
+      ];
+      let berjalan = r.original;
+      for (const s of r.steps) {
+        tahap.push({
+          label: bi(`Kupas ${s.kind}`, `Strip ${s.kind}`),
+          value: s.result,
+          note: pick(
+            bi(`membuang "${s.affix}" dari ${berjalan}`, `removes "${s.affix}" from ${berjalan}`),
+          ),
+        });
+        berjalan = s.result;
+      }
+      tahap.push({
+        label: bi("Periksa kamus", "Dictionary check"),
+        value: r.stem,
+        note: pick(
+          r.in_dictionary
+            ? bi("ditemukan di kamus — pengupasan berhenti", "found in dictionary — stripping stops")
+            : bi("tidak ada di kamus — hasil terbaik yang didapat", "not in dictionary — best effort result"),
+        ),
+        skipped: false,
+      });
+      return tahap;
+    }
+
     function renderStem(): void {
+      // Dua kata yang paling menjelaskan algoritmanya digambar alurnya; sisanya
+      // cukup ditabelkan. Menggambar keempat belasnya justru mengubur bagian
+      // yang ingin ditunjukkan.
+      const sorot = ["menyapu", "beruang"].filter((w) => SAMPLE_WORDS.includes(w));
+      const alur = sorot.length > 0 ? sorot : SAMPLE_WORDS.slice(0, 2);
+      for (const word of alur) {
+        try {
+          const r = engine.nlpStem(word);
+          output.append(
+            card(
+              pick(bi(`Pengupasan "${word}"`, `Stripping "${word}"`)),
+              figure({
+                title: bi("Alur pencarian kata dasar", "Stemming pipeline"),
+                summary: bi(
+                  r.steps.length === 0
+                    ? `Tidak ada imbuhan yang dikupas dari "${r.original}": kata itu sudah ada di kamus. ` +
+                      `Tanpa pemeriksaan kamus, aturan pengupasan akan tetap berjalan dan menghasilkan kata lain sama sekali.`
+                    : `"${r.original}" dikupas ${r.steps.length} kali menjadi "${r.stem}". ` +
+                      `Tiap kotak adalah keadaan kata setelah satu imbuhan dibuang; ` +
+                      `kotak terakhir adalah pemeriksaan kamus yang menentukan apakah pengupasan boleh berhenti.`,
+                  r.steps.length === 0
+                    ? `No affix was stripped from "${r.original}": the word is already in the dictionary. ` +
+                      `Without that check the stripping rules would run anyway and produce a different word entirely.`
+                    : `"${r.original}" was stripped ${r.steps.length} time(s) down to "${r.stem}". ` +
+                      `Each box is the word after one affix is removed; the last box is the dictionary ` +
+                      `check that decides whether stripping may stop.`,
+                ),
+                body: vizPipeline(tahapStem(r)),
+              }),
+            ),
+          );
+        } catch {
+          /* Kata yang gagal diproses cukup dilewati; tabel di bawah tetap memuatnya. */
+        }
+      }
+
       const rows: (string | number)[][] = [];
       for (const word of SAMPLE_WORDS) {
         try {
@@ -257,9 +402,54 @@ export const nlpLab: Lab = {
         .sort((a, b) => b.idf - a.idf)
         .slice(0, 12);
 
+      // Peta panas hanya memuat kata yang benar-benar membedakan. Menggambar
+      // seluruh kosakata menghasilkan matriks yang sebagian besar kosong, dan
+      // kolom kosong tidak menjelaskan apa pun.
+      const kolom = ranked.slice(0, 10).map((r) => r.term);
+      const indeks = kolom.map((t) => result.vocabulary.indexOf(t));
+      const matriks = result.vectors.map((v) => indeks.map((i) => v[i] ?? 0));
+
       output.append(
         card(
+          pick(bi("Bobot TF-IDF", "TF-IDF weights")),
+          figure({
+            title: bi("Peta panas kata lawan dokumen", "Term-by-document heatmap"),
+            summary: bi(
+              "Makin pekat sebuah sel, makin besar bobot kata itu pada dokumen tersebut. " +
+                "Kata yang muncul di semua dokumen tampak pucat di mana-mana walau sering diucapkan — " +
+                "itulah inti TF-IDF: yang sering muncul di mana-mana justru tidak informatif.",
+              "The darker a cell, the larger that term's weight in that document. Terms that appear " +
+                "in every document look pale everywhere even when frequent — that is the whole point " +
+                "of TF-IDF: what appears everywhere carries no information.",
+            ),
+            body: heatmap({
+              rows: docs.map((_, i) => `D${i + 1}`),
+              cols: kolom,
+              values: matriks,
+              format: (v) => (v === 0 ? "" : fmt(v, 2)),
+            }),
+          }),
+        ),
+        card(
           pick(bi("Kata paling membedakan", "Most distinguishing terms")),
+          figure({
+            title: bi("Peringkat IDF", "IDF ranking"),
+            summary: bi(
+              `Kata dengan IDF tertinggi hanya muncul di sedikit dokumen, jadi kehadirannya ` +
+                `banyak bercerita. Batang teratas adalah kata yang paling berguna untuk memisahkan ` +
+                `${docs.length} dokumen ini satu sama lain.`,
+              `Terms with the highest IDF appear in few documents, so their presence says a lot. ` +
+                `The top bar is the term most useful for telling these ${docs.length} documents apart.`,
+            ),
+            body: rankedBars(
+              ranked.map((r, i) => ({
+                label: r.term,
+                value: r.idf,
+                highlight: i === 0,
+              })),
+              (v) => fmt(v, 3),
+            ),
+          }),
           table(
             [pick(bi("Kata", "Term")), "IDF"],
             ranked.map((r) => [r.term, r.idf]),
@@ -276,6 +466,23 @@ export const nlpLab: Lab = {
         ),
         card(
           pick(bi("Kemiripan antardokumen", "Document similarity")),
+          figure({
+            title: bi("Matriks kemiripan kosinus", "Cosine similarity matrix"),
+            summary: bi(
+              "Diagonalnya selalu satu — setiap dokumen mirip sempurna dengan dirinya sendiri — " +
+                "dan matriksnya setangkup terhadap diagonal itu. Yang layak diperhatikan adalah " +
+                "sel di luar diagonal: di sanalah terlihat dokumen mana yang sebenarnya sepasang.",
+              "The diagonal is always one — every document matches itself perfectly — and the " +
+                "matrix is symmetric about it. What matters are the off-diagonal cells: that is " +
+                "where you see which documents actually belong together.",
+            ),
+            body: heatmap({
+              rows: docs.map((_, i) => `D${i + 1}`),
+              cols: docs.map((_, i) => `D${i + 1}`),
+              values: result.similarity,
+              format: (v) => fmt(v, 2),
+            }),
+          }),
           table(
             ["", ...docs.map((_, i) => `D${i + 1}`)],
             result.similarity.map((row, i) => [
@@ -572,5 +779,4 @@ export const nlpLab: Lab = {
     return () => {
       clear(root);
     };
-  },
-};
+}

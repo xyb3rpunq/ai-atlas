@@ -77,6 +77,27 @@ func JarakUlp(a, b float64) int64 {
 	return d
 }
 
+// LangkahUlp adalah jarak antara x dan float64 terdekat berikutnya yang lebih
+// besar nilai mutlaknya.
+//
+// Dipakai untuk menyatakan toleransi pada skala tempat aritmetikanya terjadi,
+// bukan pada hasil akhirnya. Sebuah selisih dua besaran yang hampir sama
+// memperbesar galat: dua ULP pada besaran 0,94 sama dengan 64 ULP pada hasil
+// 0,029, padahal tidak ada perhitungan yang lebih buruk di antaranya.
+//
+// Mengembalikan NaN untuk masukan yang tidak berhingga. Untuk nol dipakai
+// bilangan subnormal terkecil, yaitu langkah sesungguhnya dari nol.
+func LangkahUlp(x float64) float64 {
+	if math.IsNaN(x) || math.IsInf(x, 0) {
+		return math.NaN()
+	}
+	a := math.Abs(x)
+	if a == 0 {
+		return math.Float64frombits(1)
+	}
+	return math.Float64frombits(math.Float64bits(a)+1) - a
+}
+
 // SamaBit memeriksa kesetaraan pada tingkat pola bit, dengan NaN dianggap sama.
 //
 // Perbandingan == biasa menyatakan NaN != NaN, padahal untuk mengadu dua

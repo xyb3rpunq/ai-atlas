@@ -330,11 +330,11 @@ fn ml_exact_vectors() -> VectorFile {
 
 /// Vektor entropi. Memakai logaritma, jadi toleransi beberapa ULP.
 fn ml_entropy_vectors() -> VectorFile {
-    use ai_core::ml::{entropy, information_gain};
+    use ai_core::ml::entropy;
     let mut file = VectorFile::new(
         "ml_entropy.tsv",
         "NearlyEqual(4)",
-        "Entropi Shannon dan perolehan informasi; memakai log2",
+        "Entropi Shannon; memakai log2, yang tidak diwajibkan IEEE-754 tepat",
         vec!["op", "labels", "values", "result_hex"],
     );
 
@@ -359,6 +359,25 @@ fn ml_entropy_vectors() -> VectorFile {
             hex(entropy(&owned)),
         ]);
     }
+
+    file
+}
+
+/// Vektor perolehan informasi, terpisah dari entropi karena tingkat
+/// keterbandingannya berbeda.
+///
+/// `gain = H(sebelum) - H(sesudah)` adalah selisih dua besaran yang hampir
+/// sama, sehingga galat pada `H` membesar pada hasilnya. Kolom `scale_hex`
+/// memuat `H(sebelum)`, yaitu skala tempat aritmetikanya sesungguhnya
+/// terjadi; toleransinya diukur di sana, bukan pada hasilnya.
+fn ml_gain_vectors() -> VectorFile {
+    use ai_core::ml::{entropy, information_gain};
+    let mut file = VectorFile::new(
+        "ml_gain.tsv",
+        "CancellingDifference(4)",
+        "Perolehan informasi; selisih dua entropi yang hampir sama besar",
+        vec!["op", "labels", "values", "scale_hex", "result_hex"],
+    );
 
     // Perolehan informasi pada dataset tenis klasik.
     let y: Vec<String> = [
@@ -398,12 +417,14 @@ fn ml_entropy_vectors() -> VectorFile {
             ],
         ),
     ];
+    let skala = entropy(&y);
     for (nama, nilai) in atribut {
         let values: Vec<String> = nilai.iter().map(|v| v.to_string()).collect();
         file.push(vec![
             "information_gain".into(),
             y.join(","),
             format!("{nama}={}", values.join(",")),
+            hex(skala),
             hex(information_gain(&values, &y)),
         ]);
     }
@@ -452,6 +473,7 @@ fn main() -> std::io::Result<()> {
         fuzzy_transcendental_vectors(),
         ml_exact_vectors(),
         ml_entropy_vectors(),
+        ml_gain_vectors(),
         fx_vectors(),
     ];
 

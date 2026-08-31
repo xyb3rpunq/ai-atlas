@@ -17,10 +17,88 @@
 import * as engine from "../engine.js";
 import { T, bi, pick } from "../i18n.js";
 import { buttonRow, card, clear, el, errorNote, fmt, slider, table } from "../ui.js";
-import type { Lab } from "./registry.js";
+import { figure, nodeGraph } from "../viz.js";
+import type { GraphEdge, GraphNode } from "../viz.js";
 
 /** Ambang agar sebuah fakta dianggap kesimpulan yang layak ditampilkan. */
 const THRESHOLD = 0.2;
+
+/** Batas kedalaman saat menghitung lapisan, sebagai penjaga basis aturan berputar. */
+const MAX_LAYER = 6;
+
+/**
+ * Menghitung lapisan tiap fakta pada graf inferensi.
+ *
+ * Fakta daun berada di lapisan nol; sebuah kesimpulan berada satu lapisan di
+ * bawah premis terdalamnya. Perhitungannya diulang sampai keadaan tetap alih-
+ * alih ditelusuri rekursif, karena basis pengetahuan bisa saja berputar —
+ * dan penelusuran rekursif atas basis yang berputar akan menggantung, bukan
+ * memberi jawaban yang kurang tepat.
+ */
+function hitungLapisan(kb: engine.KnowledgeBase): Map<string, number> {
+  const lapisan = new Map<string, number>();
+  for (const rule of kb.rules) {
+    for (const p of rule.premises) {
+      if (!lapisan.has(p.fact)) lapisan.set(p.fact, 0);
+    }
+    if (!lapisan.has(rule.conclusion)) lapisan.set(rule.conclusion, 0);
+  }
+  for (let putaran = 0; putaran < MAX_LAYER; putaran += 1) {
+    let berubah = false;
+    for (const rule of kb.rules) {
+      let terdalam = 0;
+      for (const p of rule.premises) {
+        terdalam = Math.max(terdalam, lapisan.get(p.fact) ?? 0);
+      }
+      const usul = Math.min(MAX_LAYER, terdalam + 1);
+      if (usul > (lapisan.get(rule.conclusion) ?? 0)) {
+        lapisan.set(rule.conclusion, usul);
+        berubah = true;
+      }
+    }
+    if (!berubah) break;
+  }
+  return lapisan;
+}
+
+/** Menyusun simpul dan sisi graf inferensi dari basis pengetahuan dan hasilnya. */
+function grafInferensi(
+  kb: engine.KnowledgeBase,
+  forward: engine.ForwardResult,
+): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  const lapisan = hitungLapisan(kb);
+  const nilai = new Map(forward.all_facts);
+  const diberikan = new Set(forward.given.map(([f]) => f));
+  const menyala = new Set(forward.steps.map((s) => s.rule_id));
+
+  const nodes: GraphNode[] = [...lapisan.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([fact, layer]) => {
+      const cf = nilai.get(fact);
+      const kuat = cf !== undefined && Math.abs(cf) > 1e-9;
+      return {
+        id: fact,
+        label: fact,
+        layer,
+        detail: kuat ? fmt(cf, 2) : undefined,
+        tone: !kuat ? "mati" : diberikan.has(fact) ? "netral" : "aktif",
+      };
+    });
+
+  const edges: GraphEdge[] = [];
+  for (const rule of kb.rules) {
+    for (const p of rule.premises) {
+      edges.push({
+        from: p.fact,
+        to: rule.conclusion,
+        label: rule.id,
+        active: menyala.has(rule.id),
+        negated: !p.expected,
+      });
+    }
+  }
+  return { nodes, edges };
+}
 
 /** Contoh kasus siap pakai. */
 const PRESETS: { label: { id: string; en: string }; facts: Record<string, number> }[] = [
@@ -42,16 +120,14 @@ const PRESETS: { label: { id: string; en: string }; facts: Record<string, number
   },
 ];
 
-export const expertLab: Lab = {
-  slug: "expert-system",
-  session: 11,
-  title: bi("Sistem Pakar", "Expert Systems"),
-  blurb: bi(
-    "Basis pengetahuan “Dokter Virtual” dari studi kasus modul, dijalankan dua arah. Runut maju bertanya “apa yang bisa disimpulkan”; runut mundur bertanya “benarkah dugaan ini, dan gejala mana yang masih perlu saya tanyakan”.",
-    "The “Virtual Doctor” knowledge base from the course case study, run in both directions. Forward chaining asks “what follows”; backward chaining asks “is this hypothesis true, and which symptoms do I still need to ask about”.",
-  ),
-
-  mount(root: HTMLElement): () => void {
+/**
+ * Memasang laboratorium ke dalam elemen yang diberikan.
+ *
+ * Keterangannya -- judul, nomor sesi, penjelasan -- ada di
+ * `labs/registry.ts`, bukan di sini, supaya daftar isi bisa ditampilkan
+ * tanpa mengunduh mesin seluruh laboratorium lebih dulu.
+ */
+export function mount(root: HTMLElement): () => void {
     const kb = engine.expertSampleKb();
     const inspection = engine.expertInspectKb(kb);
     let facts: Record<string, number> = { ...PRESETS[0].facts };
@@ -103,6 +179,34 @@ export const expertLab: Lab = {
                 `The rule base was swept ${forward.passes} times until nothing changed. ${forward.given.length} facts came from your input and do not count as conclusions.`,
               ),
             ),
+          }),
+        ),
+      );
+
+      const graf = grafInferensi(kb, forward);
+      output.append(
+        card(
+          pick(bi("Peta basis pengetahuan", "Knowledge base map")),
+          figure({
+            title: bi("Graf inferensi", "Inference graph"),
+            summary: bi(
+              `Gejala ada di baris atas, kesimpulan di bawahnya. Garis tegas berarti ` +
+                `aturannya menyala pada masukan Anda saat ini; garis putus-putus berarti ` +
+                `aturannya ada di basis pengetahuan tetapi tidak terpakai. Tanda silang ` +
+                `menandai premis ingkar — aturan yang justru menuntut sebuah gejala tidak ` +
+                `berlaku. Dari ${kb.rules.length} aturan, ${forward.steps.length} menyala.`,
+              `Symptoms sit on the top row, conclusions below them. Solid lines mean the rule ` +
+                `fired on your current input; dashed lines mean the rule exists in the ` +
+                `knowledge base but was not used. A cross marks a negated premise — a rule ` +
+                `that requires a symptom to be absent. Of ${kb.rules.length} rules, ` +
+                `${forward.steps.length} fired.`,
+            ),
+            body: nodeGraph(graf.nodes, graf.edges),
+            legend: [
+              { color: "var(--accent)", label: bi("aturan menyala", "rule fired") },
+              { color: "var(--border-strong)", label: bi("aturan tidak terpakai", "rule unused") },
+              { color: "var(--danger)", label: bi("premis ingkar", "negated premise") },
+            ],
           }),
         ),
       );
@@ -332,5 +436,4 @@ export const expertLab: Lab = {
     return () => {
       clear(root);
     };
-  },
-};
+}

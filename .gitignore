@@ -23,3 +23,6 @@ Thumbs.db
 # Log
 *.log
 npm-debug.log*
+
+# Keluaran pemuat vektor Oracle (turunan penuh dari tools/conform/vectors)
+/oracle/generated/

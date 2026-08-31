@@ -15,7 +15,7 @@
 import * as engine from "../engine.js";
 import { T, bi, pick } from "../i18n.js";
 import { buttonRow, card, clear, el, errorNote, fmt, pct, slider, table } from "../ui.js";
-import type { Lab } from "./registry.js";
+import { figure, heatmap, rankedBars } from "../viz.js";
 
 type Tab = "knn" | "kmeans" | "tree" | "regression";
 
@@ -54,16 +54,14 @@ function seedPoints(): Point[] {
   return pts;
 }
 
-export const mlLab: Lab = {
-  slug: "machine-learning",
-  session: 13,
-  title: bi("Machine Learning", "Machine Learning"),
-  blurb: bi(
-    "Empat algoritma klasik di atas data yang Anda susun sendiri. Klik untuk menaruh titik, geser parameternya, dan perhatikan bahwa angka ketepatan hampir selalu perlu dibaca berdampingan dengan angka pembanding — model yang tidak melampaui tebakan kelas terbanyak tidak mempelajari apa pun.",
-    "Four classic algorithms on data you place yourself. Click to add points, move the parameters, and notice that accuracy nearly always needs a baseline beside it — a model that does not beat guessing the majority class has learned nothing.",
-  ),
-
-  mount(root: HTMLElement): () => void {
+/**
+ * Memasang laboratorium ke dalam elemen yang diberikan.
+ *
+ * Keterangannya -- judul, nomor sesi, penjelasan -- ada di
+ * `labs/registry.ts`, bukan di sini, supaya daftar isi bisa ditampilkan
+ * tanpa mengunduh mesin seluruh laboratorium lebih dulu.
+ */
+export function mount(root: HTMLElement): () => void {
     let tab: Tab = "knn";
     let points = seedPoints();
     let brush = "A";
@@ -280,6 +278,27 @@ export const mlLab: Lab = {
         ),
         card(
           pick(bi("Matriks konfusi", "Confusion matrix")),
+          figure({
+            title: bi("Salah tebak jatuh ke mana", "Where the mistakes land"),
+            summary: bi(
+              "Baris adalah kelas sebenarnya, kolom adalah tebakan model. Sel diagonal " +
+                "adalah tebakan yang benar; sel di luar diagonal adalah kesalahannya, dan " +
+                "letaknya jauh lebih berguna daripada jumlahnya. Model yang salah 10 kali " +
+                "pada satu pasangan kelas punya masalah yang bisa diperbaiki; model yang " +
+                "salah 10 kali tersebar merata hanya belum belajar.",
+              "Rows are the true class, columns are the model's guess. Diagonal cells are " +
+                "correct guesses; off-diagonal cells are the mistakes, and where they land " +
+                "matters far more than how many there are. A model wrong 10 times on one pair " +
+                "of classes has a fixable problem; one wrong 10 times spread evenly has simply " +
+                "not learned.",
+            ),
+            body: heatmap({
+              rows: evaluation.labels,
+              cols: evaluation.labels,
+              values: evaluation.matrix,
+              format: (v) => String(Math.round(v)),
+            }),
+          }),
           table(
             [pick(bi("Sebenarnya \\ Ramalan", "Actual \\ Predicted")), ...evaluation.labels],
             evaluation.matrix.map((row, i) => [
@@ -405,9 +424,36 @@ export const mlLab: Lab = {
       };
       walk(built.tree, 0, pick(bi("akar", "root")));
 
+      const terurut = built.gains.slice().sort((a, b) => b[1] - a[1]);
+      const juara = terurut[0];
+
       output.append(
         card(
           pick(bi("Perolehan informasi tiap atribut", "Information gain per attribute")),
+          figure({
+            title: bi("Siapa yang dipilih ID3, dan seberapa unggul", "What ID3 picks, and by how much"),
+            summary: bi(
+              `Entropi sebelum dipecah ${fmt(built.root_entropy, 3)} bit. ID3 memilih ` +
+                `"${juara?.[0] ?? "—"}" karena ia paling banyak mengurangi ketidakpastian. ` +
+                `Yang layak diperhatikan bukan pemenangnya melainkan jaraknya: kalau dua batang ` +
+                `teratas nyaris sama panjang, pilihan pohon ini rapuh — data latih yang sedikit ` +
+                `berbeda akan menghasilkan pohon yang sama sekali lain.`,
+              `Entropy before splitting is ${fmt(built.root_entropy, 3)} bits. ID3 picks ` +
+                `"${juara?.[0] ?? "—"}" because it removes the most uncertainty. What matters is ` +
+                `not the winner but the margin: if the top two bars are nearly equal, this tree's ` +
+                `choice is fragile — slightly different training data would grow a very ` +
+                `different tree.`,
+            ),
+            body: rankedBars(
+              terurut.map(([name, gain], i) => ({
+                label: name,
+                value: gain,
+                highlight: i === 0,
+                detail: `${pct(gain / Math.max(1e-12, built.root_entropy), 0)} ${pick(bi("dari entropi", "of entropy"))}`,
+              })),
+              (v) => `${fmt(v, 4)} bit`,
+            ),
+          }),
           table(
             [
               pick(bi("Atribut", "Attribute")),
@@ -761,5 +807,4 @@ export const mlLab: Lab = {
       observer.disconnect();
       clear(root);
     };
-  },
-};
+}

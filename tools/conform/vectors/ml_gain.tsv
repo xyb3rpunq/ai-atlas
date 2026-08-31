@@ -1,0 +1,10 @@
+# ai-atlas vektor uji lintas bahasa — .Deckyx
+# berkas: ml_gain.tsv
+# keterbandingan: CancellingDifference(4)
+# Perolehan informasi; selisih dua entropi yang hampir sama besar
+# seluruh pecahan ditulis sebagai 16 digit heksadesimal pola bit IEEE-754
+# kolom: op	labels	values	scale_hex	result_hex
+information_gain	Tidak,Tidak,Ya,Ya,Ya,Tidak,Ya,Tidak,Ya,Ya,Ya,Ya,Ya,Tidak	cuaca=Cerah,Cerah,Mendung,Hujan,Hujan,Hujan,Mendung,Cerah,Cerah,Hujan,Cerah,Mendung,Mendung,Hujan	3fee16d2942c1b98	3fcf957f831cd070
+information_gain	Tidak,Tidak,Ya,Ya,Ya,Tidak,Ya,Tidak,Ya,Ya,Ya,Ya,Ya,Tidak	suhu=Panas,Panas,Panas,Sejuk,Dingin,Dingin,Dingin,Sejuk,Dingin,Sejuk,Sejuk,Sejuk,Panas,Sejuk	3fee16d2942c1b98	3f9dec852f3ddfc0
+information_gain	Tidak,Tidak,Ya,Ya,Ya,Tidak,Ya,Tidak,Ya,Ya,Ya,Ya,Ya,Tidak	kelembapan=Tinggi,Tinggi,Tinggi,Tinggi,Normal,Normal,Normal,Tinggi,Normal,Normal,Normal,Tinggi,Normal,Tinggi	3fee16d2942c1b98	3fc36f58805c8bf0
+information_gain	Tidak,Tidak,Ya,Ya,Ya,Tidak,Ya,Tidak,Ya,Ya,Ya,Ya,Ya,Tidak	angin=Lemah,Kuat,Lemah,Lemah,Lemah,Kuat,Kuat,Lemah,Lemah,Lemah,Kuat,Kuat,Lemah,Kuat	3fee16d2942c1b98	3fa8a41b2b507160

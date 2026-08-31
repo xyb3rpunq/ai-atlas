@@ -19,7 +19,25 @@ import {
   stepList,
   table,
 } from "../ui.js";
-import type { Lab } from "./registry.js";
+import { dataDetails, figure, numberLine, waterfall } from "../viz.js";
+import type { Band } from "../viz.js";
+
+/**
+ * Pita tafsir CF, sama persis dengan `certainty::interpret` di Rust.
+ *
+ * Batas-batasnya disalin, bukan dihitung ulang di sini: kalau suatu hari
+ * batasnya berubah di mesin, gambarnya harus ikut berubah, dan menyalinnya
+ * membuat perbedaan itu terlihat pada satu tempat.
+ */
+const PITA: Band[] = [
+  { from: -1, to: -0.8, label: bi("pasti tidak", "definitely not"), color: "var(--danger)" },
+  { from: -0.8, to: -0.4, label: bi("hampir pasti tidak", "almost certainly not"), color: "var(--danger)" },
+  { from: -0.4, to: -0.2, label: bi("mungkin tidak", "probably not"), color: "var(--warn)" },
+  { from: -0.2, to: 0.2, label: bi("tidak diketahui", "unknown"), color: "var(--text-faint)" },
+  { from: 0.2, to: 0.4, label: bi("mungkin", "maybe"), color: "var(--warn)" },
+  { from: 0.4, to: 0.8, label: bi("hampir pasti", "almost certainly"), color: "var(--ok)" },
+  { from: 0.8, to: 1, label: bi("pasti", "definitely"), color: "var(--ok)" },
+];
 
 /** Satu potong bukti yang dimasukkan pengguna. */
 interface Evidence {
@@ -71,16 +89,14 @@ function clone(list: Evidence[]): Evidence[] {
   return list.map((e) => ({ ...e }));
 }
 
-export const certaintyLab: Lab = {
-  slug: "certainty-factor",
-  session: 3,
-  title: bi("Certainty Factor", "Certainty Factor"),
-  blurb: bi(
-    "Cara MYCIN menakar keyakinan ketika buktinya tidak pasti. Setiap bukti punya ukuran kepercayaan (MB) dan ketidakpercayaan (MD); CF adalah selisihnya, lalu bukti-bukti digabungkan satu per satu.",
-    "How MYCIN weighs belief when the evidence is uncertain. Each piece of evidence carries a measure of belief (MB) and disbelief (MD); CF is their difference, and pieces are then combined one at a time.",
-  ),
-
-  mount(root: HTMLElement): () => void {
+/**
+ * Memasang laboratorium ke dalam elemen yang diberikan.
+ *
+ * Keterangannya -- judul, nomor sesi, penjelasan -- ada di
+ * `labs/registry.ts`, bukan di sini, supaya daftar isi bisa ditampilkan
+ * tanpa mengunduh mesin seluruh laboratorium lebih dulu.
+ */
+export function mount(root: HTMLElement): () => void {
     let evidence: Evidence[] = clone(PRESETS[2].evidence);
 
     const controls = el("div");
@@ -123,7 +139,7 @@ export const certaintyLab: Lab = {
       const tone =
         combined.value >= 0.4 ? "" : combined.value <= -0.4 ? "danger" : "warn";
 
-      output.append(
+      const panel: (Node | null)[] = [
         card(
           pick(T.result),
           readout(
@@ -140,6 +156,73 @@ export const certaintyLab: Lab = {
             ),
           }),
         ),
+        card(
+          pick(bi("Letak kesimpulan", "Where the conclusion sits")),
+          figure({
+            title: bi("Garis keyakinan", "Belief line"),
+            summary: bi(
+              `Jarum berada di ${fmt(combined.value, 3)}, yaitu pita "${combined.label_id}". ` +
+                `Lingkaran kecil menandai CF tiap bukti sebelum digabung, sehingga terlihat ` +
+                `apakah kesimpulan akhirnya lebih kuat daripada bukti terkuatnya sendiri.`,
+              `The needle sits at ${fmt(combined.value, 3)}, inside the "${combined.label_en}" band. ` +
+                `Small circles mark each piece of evidence before combining, so you can see ` +
+                `whether the conclusion ends up stronger than its strongest single piece.`,
+            ),
+            body: numberLine({
+              min: -1,
+              max: 1,
+              value: combined.value,
+              bands: PITA,
+              marks: perEvidence.map((v, i) => ({
+                value: v,
+                label: evidence[i]?.name.slice(0, 10) ?? "",
+              })),
+            }),
+            legend: [
+              { color: "var(--accent)", label: bi("CF gabungan", "combined CF") },
+              { color: "var(--text-muted)", label: bi("CF tiap bukti", "per-evidence CF") },
+            ],
+          }),
+        ),
+        // Air terjun hanya bermakna kalau ada lebih dari satu bukti; dengan
+        // satu bukti ia cuma menggambar ulang angka yang sudah terbaca di atas.
+        combined.steps.length > 1
+          ? card(
+              pick(bi("Jalannya penggabungan", "How the combination unfolds")),
+              figure({
+                title: bi("Air terjun bukti", "Evidence waterfall"),
+                summary: bi(
+                  "Tiap batang berangkat dari hasil batang sebelumnya, bukan dari nol. " +
+                    "Batang hijau menaikkan keyakinan, batang merah menurunkannya. " +
+                    "Perhatikan bahwa bukti yang datang belakangan menggeser lebih sedikit: " +
+                    "makin yakin sebuah kesimpulan, makin sulit digeser bukti tambahan.",
+                  "Each bar starts from the previous result, not from zero. Green bars raise " +
+                    "the belief, red bars lower it. Notice that later evidence moves the needle " +
+                    "less: the more certain a conclusion already is, the harder extra evidence " +
+                    "can shift it.",
+                ),
+                body: waterfall(
+                  combined.steps.map((s, i) => ({
+                    label: i === 0 ? (evidence[0]?.name ?? "CF0") : (evidence[i]?.name ?? `CF${i}`),
+                    value: s.value,
+                  })),
+                  -1,
+                  1,
+                ),
+                legend: [
+                  { color: "var(--accent)", label: bi("menguatkan", "reinforces") },
+                  { color: "var(--danger)", label: bi("melemahkan", "weakens") },
+                ],
+              }),
+              dataDetails(
+                [pick(T.evidence), pick(bi("CF setelah langkah ini", "CF after this step"))],
+                combined.steps.map((s, i) => [
+                  evidence[i]?.name ?? `CF${i}`,
+                  s.value,
+                ]),
+              ),
+            )
+          : null,
         card(
           pick(bi("CF tiap bukti", "CF per piece of evidence")),
           table(
@@ -161,7 +244,8 @@ export const certaintyLab: Lab = {
             })),
           ),
         ),
-      );
+      ];
+      output.append(...panel.filter((n): n is Node => n !== null));
       // `tone` dipakai untuk mewarnai bilah ringkas di bawah angka utama.
       const summary = el("div", { class: "bar", children: [] });
       const fill = el("div", {
@@ -281,5 +365,4 @@ export const certaintyLab: Lab = {
     return () => {
       clear(root);
     };
-  },
-};
+}

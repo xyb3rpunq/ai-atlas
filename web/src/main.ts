@@ -20,6 +20,15 @@ const app = document.querySelector<HTMLElement>("#app");
 /** Pembersih laboratorium yang sedang tampil. */
 let disposeLab: (() => void) | null = null;
 
+/**
+ * Nomor urut pemuatan laboratorium.
+ *
+ * Bertambah tiap kali sebuah laboratorium mulai dimuat. Pemuatan yang selesai
+ * dengan nomor lama berarti penggunanya sudah berpindah halaman, dan hasilnya
+ * harus dibuang alih-alih dipasang ke halaman yang sudah berganti.
+ */
+let muatKe = 0;
+
 /** Tema yang sedang aktif. */
 function theme(): "dark" | "light" {
   return document.documentElement.dataset.theme === "light" ? "light" : "dark";
@@ -290,10 +299,25 @@ function notesSection(slug: string): HTMLElement | null {
   });
 }
 
-/** Halaman satu laboratorium. */
+/**
+ * Halaman satu laboratorium.
+ *
+ * Judul, penjelasan, dan catatannya digambar seketika dari katalog; mesinnya
+ * menyusul lewat `import()` yang berkas terpisah. Urutan ini disengaja:
+ * pengunjung langsung melihat halaman yang benar dan bisa mulai membaca,
+ * alih-alih menatap layar kosong sampai seluruh kodenya turun.
+ *
+ * Pemasangannya diperiksa dua kali terhadap `disposeLab`: pengguna bisa saja
+ * berpindah halaman sementara modulnya masih diunduh, dan memasang
+ * laboratorium ke dalam elemen yang sudah dibuang akan meninggalkan gelang
+ * animasi yang terus berjalan tanpa ada yang bisa menghentikannya.
+ */
 function labPage(lab: Lab): HTMLElement {
-  const body = el("div");
-  const catatan = notesSection(lab.slug);
+  const body = el("div", {
+    children: [
+      el("p", { class: "note", text: pick(T.loading) }),
+    ],
+  });
   const page = el("div", {
     children: [
       el("header", {
@@ -308,10 +332,30 @@ function labPage(lab: Lab): HTMLElement {
         ],
       }),
       body,
-      catatan,
+      notesSection(lab.slug),
     ],
   });
-  disposeLab = lab.mount(body);
+
+  const tokenSaatIni = ++muatKe;
+  void lab
+    .load()
+    .then((modul) => {
+      if (tokenSaatIni !== muatKe) return;
+      clear(body);
+      disposeLab = modul.mount(body);
+    })
+    .catch((error: unknown) => {
+      if (tokenSaatIni !== muatKe) return;
+      clear(body);
+      body.append(
+        el("p", {
+          class: "error",
+          attrs: { role: "alert" },
+          text: `${pick(T.loadFailed)}: ${(error as Error).message}`,
+        }),
+      );
+    });
+
   return page;
 }
 
@@ -367,6 +411,8 @@ function render(): void {
   if (!app) return;
   disposeLab?.();
   disposeLab = null;
+  // Pemuatan yang masih berjalan ditandai basi sebelum halaman diganti.
+  muatKe += 1;
 
   const slug = currentSlug();
   const lab = slug ? findLab(slug) : undefined;
@@ -423,6 +469,54 @@ async function start(): Promise<void> {
   globalThis.addEventListener("hashchange", render);
   onLangChange(render);
   render();
+  prefetchLabs();
+}
+
+/**
+ * Mengunduh modul laboratorium yang belum dipakai, setelah halaman pertama
+ * selesai digambar.
+ *
+ * Pemecahan kode memperbaiki pemuatan pertama tetapi merusak dua hal lain:
+ * berpindah laboratorium jadi menunggu unduhan, dan laboratorium yang belum
+ * pernah dibuka tidak ada di singgahan sehingga hilang saat luring. Pengambilan
+ * di belakang layar ini mengembalikan keduanya tanpa mengorbankan pemuatan
+ * pertamanya.
+ *
+ * Dilewati sepenuhnya pada sambungan lambat atau saat penghemat data menyala:
+ * pengguna yang menyalakan penghemat data sedang menyatakan sesuatu, dan
+ * mengunduh sebelas modul yang mungkin tidak pernah dibuka adalah persis yang
+ * ia minta jangan dilakukan.
+ */
+function prefetchLabs(): void {
+  const koneksi = (
+    navigator as Navigator & {
+      connection?: { saveData?: boolean; effectiveType?: string };
+    }
+  ).connection;
+  if (koneksi?.saveData === true) return;
+  if (koneksi?.effectiveType && /2g/.test(koneksi.effectiveType)) return;
+
+  const antre = LABS.filter((l) => l.slug !== currentSlug());
+  const jalan = (): void => {
+    const berikut = antre.shift();
+    if (!berikut) return;
+    // Berurutan, bukan serentak: sebelas permintaan sekaligus akan bersaing
+    // dengan modul WebAssembly dan gambar yang mungkin masih dalam perjalanan.
+    void berikut
+      .load()
+      .catch(() => {
+        /* Gagal mengambil di muka bukan galat; modulnya diambil lagi saat dibuka. */
+      })
+      .finally(jalan);
+  };
+
+  const mulai = (): void => jalan();
+  if ("requestIdleCallback" in globalThis) {
+    (globalThis as unknown as { requestIdleCallback: (cb: () => void) => void })
+      .requestIdleCallback(mulai);
+  } else {
+    globalThis.setTimeout(mulai, 1500);
+  }
 }
 
 /**

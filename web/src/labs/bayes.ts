@@ -23,7 +23,7 @@ import {
   stepList,
   table,
 } from "../ui.js";
-import type { Lab } from "./registry.js";
+import { figure, numberLine } from "../viz.js";
 
 /** Keadaan penggeser. */
 interface State {
@@ -119,16 +119,14 @@ function drawFrequencyGrid(
   }
 }
 
-export const bayesLab: Lab = {
-  slug: "bayesian",
-  session: 4,
-  title: bi("Probabilitas Bayesian", "Bayesian Probability"),
-  blurb: bi(
-    "Teorema Bayes membalik arah pertanyaan: dari “seberapa sering gejala muncul pada yang sakit” menjadi “seberapa mungkin sakit bila gejalanya muncul”. Geser penggesernya dan perhatikan betapa jauh hasilnya dari tebakan intuitif.",
-    "Bayes' theorem reverses the question: from “how often does the symptom appear in the ill” to “how likely is illness given the symptom”. Move the sliders and watch how far the answer drifts from intuition.",
-  ),
-
-  mount(root: HTMLElement): () => void {
+/**
+ * Memasang laboratorium ke dalam elemen yang diberikan.
+ *
+ * Keterangannya -- judul, nomor sesi, penjelasan -- ada di
+ * `labs/registry.ts`, bukan di sini, supaya daftar isi bisa ditampilkan
+ * tanpa mengunduh mesin seluruh laboratorium lebih dulu.
+ */
+export function mount(root: HTMLElement): () => void {
     let state: State = { ...PRESETS[0].state };
 
     const controls = el("div");
@@ -177,6 +175,46 @@ export const bayesLab: Lab = {
                 `Out of every 1,000 cases, ${Math.round(1000 * result.evidence)} show ${e}. Among those, ${Math.round(1000 * state.prior * state.sensitivity)} genuinely are ${h}.`,
               ),
             ),
+          }),
+        ),
+        card(
+          pick(bi("Seberapa jauh bukti menggeser keyakinan", "How far the evidence moves belief")),
+          figure({
+            title: bi("Dari prior ke posterior", "From prior to posterior"),
+            summary: bi(
+              `Lingkaran kecil adalah keyakinan sebelum bukti (${pct(state.prior, 2)}); ` +
+                `jarum adalah keyakinan sesudahnya (${pct(result.posterior, 2)}). ` +
+                (result.posterior < 0.5 && state.sensitivity > 0.9
+                  ? `Perhatikan: uji ini benar ${pct(state.sensitivity, 0)} dari waktunya, tetapi ` +
+                    `hasil positifnya tetap lebih sering salah daripada benar. Bukan ujinya yang ` +
+                    `buruk — priornya yang terlalu kecil, dan itulah kekeliruan mengabaikan laju dasar.`
+                  : `Jarak antara keduanya adalah seluruh sumbangan bukti ini. Bukti yang kuat ` +
+                    `pada prior yang sangat kecil tetap menghasilkan posterior yang kecil.`),
+              `The small circle is belief before the evidence (${pct(state.prior, 2)}); the needle ` +
+                `is belief after (${pct(result.posterior, 2)}). ` +
+                (result.posterior < 0.5 && state.sensitivity > 0.9
+                  ? `Note this: the test is right ${pct(state.sensitivity, 0)} of the time, yet a ` +
+                    `positive result is still wrong more often than right. The test is not bad — ` +
+                    `the prior is simply tiny, and that is base rate neglect.`
+                  : `The gap between them is this evidence's entire contribution. Strong evidence ` +
+                    `on a very small prior still leaves a small posterior.`),
+            ),
+            body: numberLine({
+              min: 0,
+              max: 1,
+              value: result.posterior,
+              bands: [
+                { from: 0, to: 0.25, label: bi("kecil", "small"), color: "var(--text-faint)" },
+                { from: 0.25, to: 0.5, label: bi("kurang dari separuh", "under half"), color: "var(--warn)" },
+                { from: 0.5, to: 0.75, label: bi("lebih dari separuh", "over half"), color: "var(--ok)" },
+                { from: 0.75, to: 1, label: bi("hampir pasti", "near certain"), color: "var(--ok)" },
+              ],
+              marks: [{ value: state.prior, label: "prior" }],
+            }),
+            legend: [
+              { color: "var(--accent)", label: bi("posterior", "posterior") },
+              { color: "var(--text-muted)", label: bi("prior", "prior") },
+            ],
           }),
         ),
         card(
@@ -284,8 +322,7 @@ export const bayesLab: Lab = {
       observer.disconnect();
       clear(root);
     };
-  },
-};
+}
 
 /** Diekspor terpisah supaya bisa diuji tanpa DOM penuh. */
 export const _internal = { fmt, drawFrequencyGrid };

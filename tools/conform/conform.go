@@ -10,9 +10,10 @@
 //
 // Tiap berkas vektor menyatakan tingkat keterbandingannya:
 //
-//	BitExact          wajib identik bit demi bit; hanya untuk + - x / sqrt
-//	NearlyEqual(n)    boleh berbeda n ULP; untuk exp, ln, log2, pow
-//	PropertyOnly      hanya sifatnya yang diuji, bukan angkanya
+//	BitExact                  wajib identik bit demi bit; hanya untuk + - x / sqrt
+//	NearlyEqual(n)            boleh berbeda n ULP; untuk exp, ln, log2, pow
+//	CancellingDifference(n)   boleh berbeda n ULP diukur pada skala masukannya
+//	PropertyOnly              hanya sifatnya yang diuji, bukan angkanya
 //
 // Pembagian itu bukan kelonggaran melainkan keharusan: IEEE-754 hanya
 // mewajibkan enam operasi dibulatkan dengan benar, dan fungsi transendental
@@ -41,9 +42,15 @@ type Keterbandingan struct {
 	MaksUlp int64
 	// SifatSaja berarti angkanya tidak dibandingkan sama sekali.
 	SifatSaja bool
+	// PakaiSkala berarti toleransinya diukur pada skala yang disertakan
+	// berkas vektor, bukan pada hasilnya. Dipakai untuk besaran yang berupa
+	// selisih dua nilai yang hampir sama, karena di sana galat kecil pada
+	// masukannya membesar pada hasilnya tanpa ada perhitungan yang keliru.
+	PakaiSkala bool
 }
 
 var polaNearly = regexp.MustCompile(`^NearlyEqual\((\d+)\)$`)
+var polaSelisih = regexp.MustCompile(`^CancellingDifference\((\d+)\)$`)
 
 // BacaKeterbandingan menguraikan penanda keterbandingan dari kepala berkas.
 func BacaKeterbandingan(s string) (Keterbandingan, error) {
@@ -60,6 +67,13 @@ func BacaKeterbandingan(s string) (Keterbandingan, error) {
 			return Keterbandingan{}, fmt.Errorf("toleransi tidak terbaca: %q", t)
 		}
 		return Keterbandingan{Nama: t, MaksUlp: n}, nil
+	}
+	if m := polaSelisih.FindStringSubmatch(t); m != nil {
+		n, err := strconv.ParseInt(m[1], 10, 64)
+		if err != nil {
+			return Keterbandingan{}, fmt.Errorf("toleransi tidak terbaca: %q", t)
+		}
+		return Keterbandingan{Nama: t, MaksUlp: n, PakaiSkala: true}, nil
 	}
 	return Keterbandingan{}, fmt.Errorf("tingkat keterbandingan tidak dikenal: %q", t)
 }
@@ -80,6 +94,13 @@ func (k Keterbandingan) Terpenuhi(a, b float64) bool {
 	if aicore.SamaBit(a, b) {
 		return true
 	}
+	// Tingkat berskala menuntut skala, dan skalanya tidak ada di sini. Yang
+	// dikembalikan adalah pemeriksaan paling ketat, bukan paling longgar:
+	// pemanggil yang lupa memberi skala melihat kegagalan, bukan kelolosan
+	// palsu.
+	if k.PakaiSkala {
+		return false
+	}
 	if k.MaksUlp == 0 {
 		return false
 	}
@@ -88,6 +109,23 @@ func (k Keterbandingan) Terpenuhi(a, b float64) bool {
 		return false
 	}
 	return d <= k.MaksUlp
+}
+
+// TerpenuhiSkala seperti Terpenuhi, tetapi menyertakan skala tempat
+// aritmetikanya terjadi. Hanya tingkat berskala yang memakainya.
+func (k Keterbandingan) TerpenuhiSkala(a, b, skala float64) bool {
+	if !k.PakaiSkala {
+		return k.Terpenuhi(a, b)
+	}
+	if aicore.SamaBit(a, b) {
+		return true
+	}
+	if math.IsNaN(a) || math.IsInf(a, 0) ||
+		math.IsNaN(b) || math.IsInf(b, 0) ||
+		math.IsNaN(skala) || math.IsInf(skala, 0) {
+		return false
+	}
+	return math.Abs(a-b) <= float64(k.MaksUlp)*aicore.LangkahUlp(skala)
 }
 
 // Berkas adalah satu berkas vektor yang sudah diuraikan.
@@ -416,6 +454,29 @@ func periksaMlEntropy(baris []string) (float64, float64, string, bool, error) {
 	return 0, 0, "", false, nil
 }
 
+// periksaMlGain mencocokkan perolehan informasi.
+//
+// Terpisah dari entropi karena tingkat keterbandingannya berbeda: hasilnya
+// adalah selisih dua entropi yang hampir sama besar, sehingga toleransinya
+// diukur pada kolom skala, bukan pada hasilnya.
+func periksaMlGain(baris []string) (float64, float64, string, bool, error) {
+	if len(baris) < 5 {
+		return 0, 0, "", false, fmt.Errorf("baris perolehan tidak lengkap")
+	}
+	harapan, err := hexAtau(baris[4])
+	if err != nil {
+		return 0, 0, "", false, err
+	}
+	labels := strings.Split(baris[1], ",")
+	bagian := strings.SplitN(baris[2], "=", 2)
+	if len(bagian) != 2 {
+		return 0, 0, "", false, fmt.Errorf("atribut tidak terbaca: %q", baris[2])
+	}
+	values := strings.Split(bagian[1], ",")
+	return harapan, aicore.PerolehanInformasi(values, labels),
+		"perolehan " + bagian[0], true, nil
+}
+
 // periksaFx mencocokkan bolak-balik pola bit.
 func periksaFx(baris []string) (float64, float64, string, bool, error) {
 	if len(baris) < 2 {
@@ -441,6 +502,7 @@ var pemeriksaBerkas = map[string]pemeriksa{
 	"fuzzy_transcendental.tsv": periksaFuzzyTranscendental,
 	"ml_exact.tsv":             periksaMlExact,
 	"ml_entropy.tsv":           periksaMlEntropy,
+	"ml_gain.tsv":              periksaMlGain,
 	"fx.tsv":                   periksaFx,
 }
 
@@ -449,6 +511,22 @@ func PeriksaBerkas(b *Berkas) (Hasil, error) {
 	fn, ada := pemeriksaBerkas[b.Nama]
 	if !ada {
 		return Hasil{}, fmt.Errorf("tidak ada pemeriksa untuk %s", b.Nama)
+	}
+
+	// Tingkat berskala memerlukan kolom skala; berkasnya harus menyebutkannya
+	// di baris kepala. Berkas yang menyatakan tingkat itu tanpa kolomnya
+	// adalah salah tulis, bukan alasan untuk diam-diam melonggarkan periksa.
+	kolomSkala := -1
+	if b.Keterbandingan.PakaiSkala {
+		for i, nama := range b.Kolom {
+			if nama == "scale_hex" {
+				kolomSkala = i
+			}
+		}
+		if kolomSkala < 0 {
+			return Hasil{}, fmt.Errorf("%s: tingkat %s menuntut kolom scale_hex",
+				b.Nama, b.Keterbandingan.Nama)
+		}
 	}
 
 	hasil := Hasil{Berkas: b.Nama, Keterbandingan: b.Keterbandingan.Nama}
@@ -462,7 +540,17 @@ func PeriksaBerkas(b *Berkas) (Hasil, error) {
 			continue
 		}
 		hasil.Diperiksa++
-		if !b.Keterbandingan.Terpenuhi(harapan, diperoleh) {
+		skala := math.NaN()
+		if kolomSkala >= 0 {
+			if kolomSkala >= len(baris) {
+				return hasil, fmt.Errorf("%s baris %d: kolom scale_hex kosong", b.Nama, i+1)
+			}
+			skala, err = aicore.DariHex(baris[kolomSkala])
+			if err != nil {
+				return hasil, fmt.Errorf("%s baris %d: skala tidak terbaca: %w", b.Nama, i+1, err)
+			}
+		}
+		if !b.Keterbandingan.TerpenuhiSkala(harapan, diperoleh, skala) {
 			hasil.Gagal = append(hasil.Gagal, Ketidakcocokan{
 				Berkas:    b.Nama,
 				Baris:     i + 1,

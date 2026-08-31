@@ -40,12 +40,12 @@ Rumus yang salah tidak akan membuat program *crash*. Ia hanya mengeluarkan angka
               │                        │                        │
    ┌──────────▼─────────┐  ┌───────────▼──────────┐  ┌──────────▼──────────┐
    │  crates/ai-wasm    │  │  tools/conform (Go)  │  │  oracle/ (PL/SQL)   │
-   │  wasm-bindgen      │  │  implementasi ke-2 ✅│  │  implementasi ke-3  │
+   │  wasm-bindgen      │  │  implementasi ke-2 ✅│  │  implementasi ke-3 ✅│
    │  → peramban        │  │  + harness pembanding│  │  + basis pengetahuan│
    └──────────┬─────────┘  └───────────┬──────────┘  └──────────┬──────────┘
               │                        │                        │
               │                        └───── bandingkan ───────┘
-              │                          2.266 vektor pola bit
+              │                          2.266 vektor → 3.796 pernyataan
               │                          selisih 1 ULP = build gagal
    ┌──────────▼─────────┐
    │  web/  TypeScript  │
@@ -57,21 +57,40 @@ Tiga implementasi independen dari matematika yang sama. CI menjalankan ribuan ka
 
 ### Status konformansi
 
-| Berkas vektor | Baris | Tingkat | Rust ⟷ Go |
-|---|---:|---|:---:|
-| `bayes.tsv` | 729 | BitExact | ✅ |
-| `certainty.tsv` | 680 | BitExact | ✅ |
-| `fuzzy_linear.tsv` | 520 | BitExact | ✅ |
-| `fuzzy_transcendental.tsv` | 222 | NearlyEqual(4) | ✅ |
-| `rng.tsv` | 72 | BitExact | ✅ |
-| `ml_exact.tsv` | 18 | BitExact | ✅ |
-| `fx.tsv` | 14 | BitExact | ✅ |
-| `ml_entropy.tsv` | 11 | NearlyEqual(4) | ✅ |
-| **Total** | **2.266** | | **cocok** |
+Setiap berkas vektor memuat beberapa keluaran per baris — satu baris Bayes memuat P(E), posterior, dan rasio kemungkinan sekaligus. Pemuat Oracle memecahnya menjadi **satu baris tabel per keluaran**, sehingga laporan ketidakcocokan menunjuk ke satu perhitungan tertentu dan bukan ke sekumpulan perhitungan yang kebetulan ditulis di baris yang sama.
+
+| Berkas vektor | Baris | Tingkat | Rust ⟷ Go | Rust ⟷ PL/SQL |
+|---|---:|---|:---:|:---:|
+| `bayes.tsv` | 729 | BitExact | ✅ | ✅ 2.187 |
+| `certainty.tsv` | 680 | BitExact | ✅ | ✅ 680 |
+| `fuzzy_linear.tsv` | 520 | BitExact | ✅ | ✅ 520 |
+| `fuzzy_transcendental.tsv` | 222 | NearlyEqual(4) | ✅ | ✅ 222 |
+| `rng.tsv` | 72 | BitExact | ✅ | ✅ 144 |
+| `ml_exact.tsv` | 18 | BitExact | ✅ | ✅ 18 |
+| `fx.tsv` | 14 | BitExact | ✅ | ✅ 14 |
+| `ml_entropy.tsv` | 7 | NearlyEqual(4) | ✅ | ✅ 7 |
+| `ml_gain.tsv` | 4 | CancellingDifference(4) | ✅ | ✅ 4 |
+| **Total** | **2.266** | | **cocok** | **3.796 cocok** |
+
+Terukur pada jalan terakhir: **3.752 cocok bit demi bit, 44 berbeda hanya pada tanda nol, 0 gagal.** Penyimpangan terjauh 2 ULP — separuh dari batas yang dipasang.
 
 Harness-nya sendiri punya uji: sebuah vektor yang sengaja dirusak sebesar satu ULP harus tertangkap, dilaporkan di baris yang benar, dengan kedua pola bitnya. Harness yang selalu lolos tidak berguna.
 
 CI juga memeriksa bahwa vektor yang tersimpan masih sepadan dengan keluaran Rust. Kalau berbeda, berarti perilaku numerik berubah tanpa ada yang menyadarinya — dan perubahan seperti itu wajib disengaja.
+
+### Catatan teknis: Oracle tidak punya nol negatif
+
+Pengukuran terhadap Oracle Free 23ai menemukan bahwa `BINARY_DOUBLE` **mengubah `-0` menjadi `+0`**, bahkan pada konversi langsung dari pola bitnya:
+
+```sql
+UTL_RAW.CAST_TO_BINARY_DOUBLE(HEXTORAW('8000000000000000'))  -->  0000000000000000
+```
+
+Tiga tempat di vektor uji menghasilkan nol negatif — `entropy(['A'])`, `cf_sequential(-1, -1)`, dan nilai batas `fx.tsv` — dan seluruhnya mustahil direproduksi di Oracle. Jawabannya bukan melonggarkan perbandingan, melainkan **memberi status tersendiri yang bisa dihitung**: putusan `Z` hanya diberikan bila kedua nilainya benar-benar nol, sehingga selisih apa pun selain tanda nol tetap dihitung gagal. Jumlahnya dilaporkan tiap jalan (44), sehingga tidak bisa diam-diam bertambah.
+
+Perilaku Oracle itu sendiri dikunci uji, supaya kelonggarannya bisa dicabut kalau suatu hari Oracle berubah.
+
+### Catatan teknis: kenapa pola bit, bukan desimal
 
 ### Catatan teknis: kenapa pola bit, bukan desimal
 
@@ -89,9 +108,33 @@ Menuntut kesamaan bit pada perhitungan seperti itu akan menghasilkan uji yang ga
 |---|---|---|
 | `BitExact` | Hanya `+ − × ÷ √` dan perbandingan | Identik bit demi bit |
 | `NearlyEqual(n)` | Menyentuh `exp`, `ln`, `tanh`, `pow` | Selisih maksimal `n` ULP (bawaan 4) |
+| `CancellingDifference(n)` | Hasil yang berupa selisih dua besaran hampir sama | Selisih maksimal `n` ULP **diukur pada skala masukannya** |
 | `PropertyOnly` | Perhitungan kacau, mis. pelatihan divergen | Hanya sifatnya, mis. "yang wajar lebih baik daripada yang ekstrem" |
 
-Penggolongan ini menentukan bentuk harness Go dan PL/SQL nanti. Tanpa itu, seluruh perbandingan tiga arah akan dibangun di atas asumsi yang salah.
+Tingkat keempat lahir dari kegagalan sungguhan. Perolehan informasi adalah `H(sebelum) − H(sesudah)`; pada dataset tenis nilainya 0,94 dikurangi 0,91. Galat dua ULP pada `H` — wajar, karena `log2` bukan operasi yang dibulatkan dengan benar menurut IEEE-754 — bernilai mutlak sekitar 2,2×10⁻¹⁶. Pada hasil sebesar 0,029, nilai itu sama dengan **64 ULP**. Menuntut `NearlyEqual(4)` di sana berarti menuntut implementasi `log2` yang lebih teliti daripada yang diwajibkan standar mana pun.
+
+Yang benar adalah menyatakan toleransinya di tempat aritmetikanya sungguh-sungguh terjadi: `|a − b| ≤ n × ulp(skala)`, dengan skala disertakan berkas vektornya sebagai kolom `scale_hex`. Berkas yang menyatakan tingkat ini tanpa kolom itu ditolak harness — dan ditolak juga oleh `CHECK` di tabel Oracle.
+
+Penggolongan ini menentukan bentuk harness Go dan PL/SQL. Tanpa itu, seluruh perbandingan tiga arah akan dibangun di atas asumsi yang salah.
+
+## Visualisasi di setiap modul
+
+Setiap laboratorium menampilkan besarannya sebagai gambar, bukan hanya tabel. Yang menentukan bentuk gambarnya adalah pertanyaan yang ingin dijawab, bukan variasi:
+
+| Bentuk | Menjawab | Dipakai di |
+|---|---|---|
+| Garis bilangan berpita | "Angka ini letaknya di mana, dan apa artinya di sana" | Certainty factor, Bayesian |
+| Air terjun | "Bukti mana yang paling menggeser kesimpulan" | Certainty factor |
+| Graf berlapis | "Apa menyimpulkan apa, lewat aturan mana" | Sistem pakar, resolusi, jaringan semantik |
+| Peta panas | "Nilai mana yang menonjol di dalam matriks" | TF-IDF, kemiripan dokumen, matriks konfusi, tabel kebenaran |
+| Alur bertahap | "Benda yang sama berubah menjadi apa di tiap tahap" | Stemming, pipeline NLP, ELIZA |
+| Bilah terurut | "Siapa menang, dan seberapa unggul" | Perolehan informasi ID3, biaya agen, keutamaan aturan, IDF |
+| Siklus tertutup | "Kenapa ini gelang, bukan garis" | Agen cerdas |
+| Kanvas | Piksel dan animasi | Peta pencarian, pelatihan jaringan, kurva kabur, robot |
+
+**Gambar struktural memakai SVG, bukan kanvas.** Bukan selera: kanvas tidak terlihat oleh pembaca layar, harus digambar ulang tiap kali tema berganti, dan harus mengurus `devicePixelRatio` sendiri. SVG mewarisi warna lewat variabel CSS, sehingga pergantian terang-gelap tidak memerlukan satu baris kode pun. Kanvas tetap dipakai di tempat yang memang membutuhkannya — peta penelusuran yang menggambar ribuan petak tiap bingkai.
+
+**Setiap gambar wajib punya padanan teks.** Fungsi `figure()` menuntut argumen `summary`, dan keterangannya menjadi `aria-label` gambar sekaligus tulisan di bawahnya. Keterangannya bukan pengulangan judul: ia menyebutkan apa yang sedang dilihat dan apa artinya, sebab pembaca yang paling butuh gambar adalah yang belum memahami topiknya.
 
 ## Peta silabus
 
@@ -120,13 +163,22 @@ Batas ini diperiksa otomatis di CI. Build gagal kalau terlampaui — bukan sekad
 
 | Metrik | Anggaran | Terukur |
 |--------|---------:|--------:|
-| WebAssembly (gzip) | ≤ 400 KB | **228 KB** |
-| JavaScript (gzip) | ≤ 60 KB | **40 KB** |
-| CSS (gzip) | ≤ 20 KB | **2,8 KB** |
-| Total muat pertama (gzip) | ≤ 460 KB | **219,7 KB** |
+| WebAssembly (gzip) | ≤ 400 KB | **229,1 KB** |
+| JavaScript inti (gzip) | ≤ 60 KB | **33,9 KB** |
+| Satu laboratorium (gzip) | ≤ 60 KB | **2,4 – 5,7 KB** |
+| CSS (gzip) | ≤ 20 KB | **3,3 KB** |
+| Total seluruh berkas (gzip) | ≤ 460 KB | **319,9 KB** |
 | Dependensi saat berjalan | 0 | **0** |
 
 Tidak ada React, tidak ada kerangka kerja, tidak ada CDN. Seluruh antarmukanya hanya beberapa lusin simpul DOM, jadi membangunnya langsung lebih ringan daripada memuat pustaka mana pun.
+
+### Kode dipecah per laboratorium
+
+Katalog laboratorium — judul, nomor sesi, penjelasan — dibutuhkan sejak halaman pertama dibuka. Mesinnya tidak: pengunjung yang membuka satu laboratorium tidak punya alasan mengunduh sebelas yang lain. Karena itu tiap laboratorium dimuat lewat `import()` tersendiri, dan berkas intinya menyusut dari 71 KB menjadi **33,9 KB gzip**.
+
+Pemecahan kode memperbaiki pemuatan pertama tetapi merusak dua hal lain: berpindah laboratorium jadi menunggu unduhan, dan laboratorium yang belum pernah dibuka hilang saat luring. Keduanya dikembalikan dengan mengambil modul sisanya di belakang layar setelah halaman pertama selesai digambar — **dilewati sepenuhnya** saat penghemat data menyala atau sambungannya 2G, karena pengguna yang menyalakan penghemat data sedang meminta persis agar itu tidak dilakukan.
+
+Ada satu jebakan yang mudah terlewat: pengguna bisa berpindah halaman sementara modulnya masih diunduh. Memasang laboratorium ke elemen yang sudah dibuang akan meninggalkan gelang animasi yang terus berjalan tanpa ada yang bisa menghentikannya, jadi tiap pemuatan diberi nomor urut dan hasil bernomor basi dibuang.
 
 ## Menjalankan secara lokal
 
@@ -155,6 +207,7 @@ npm run dev       # buka http://localhost:5173
 | `cargo run -p ai-core --bin export_vectors` | Menghasilkan ulang vektor uji lintas bahasa |
 | `cd tools/conform && go test ./...` | Uji harness konformansi |
 | `cd tools/conform && go run .` | Mengadu implementasi Rust terhadap Go |
+| `bash oracle/run.sh` | Menyalakan Oracle, memasang skema, konformansi, dan uji PL/SQL |
 | `npm run audit:all` | Periksa tipe + seluruh uji |
 | `cargo test --workspace` | Seluruh uji Rust |
 | `cargo clippy --workspace --all-targets -- -D warnings` | Pemeriksaan gaya, peringatan dianggap galat |
@@ -182,9 +235,14 @@ Setiap fungsi publik punya uji. Bukan uji jalur bahagia saja — uji nilai batas
 | `lib.rs` | 2 | 4 |
 | `ai-wasm/lib.rs` | 55 | 70 |
 | `web/src/ui.ts` | 11 | 15 |
+| `web/src/viz.ts` | 11 | 42 |
 | `web/src/labs/notes.ts` | 1 | 54 |
-| `tools/conform` (Go) | 22 | 10 |
-| **Total** | **366** | **641** |
+| `web/src/labs/registry.ts` | 2 | 21 |
+| `tools/conform` (Go) | 23 | 12 |
+| `oracle/` (PL/SQL) | 27 | 60 |
+| **Total** | **406** | **759** |
+
+Ditambah **3.796 pernyataan konformansi** yang mengadu ketiga implementasi terhadap vektor yang sama. Angka itu bukan bagian dari 759 di atas: uji unit membuktikan tiap implementasi konsisten dengan dirinya sendiri, sedangkan konformansi membuktikan ketiganya sepakat satu sama lain — dan hanya yang kedua yang bisa menangkap rumus yang salah tetapi konsisten.
 
 Beberapa uji yang menahan seluruh proyek ini tetap jujur:
 
@@ -198,6 +256,18 @@ Beberapa uji yang menahan seluruh proyek ini tetap jujur:
   keluaran. Uji inilah yang menemukan bug himpunan bahu.
 - **Reproduktifitas** — benih yang sama harus menghasilkan bobot, labirin, dan
   jejak pencarian yang identik bit demi bit.
+- **Setiap gambar punya padanan teks** — `figure()` menuntut keterangan, dan
+  ujinya memeriksa bahwa keterangan itu benar-benar sampai ke `aria-label`.
+  Gambar tanpa keterangan adalah kotak kosong bagi pengguna pembaca layar, dan
+  tidak ada uji lain di repositori ini yang akan menangkapnya.
+- **Setiap `import()` benar-benar dipanggil** — jalur modul yang salah tulis
+  tidak tertangkap pemeriksa tipe maupun build; Vite tetap menghasilkan berkas,
+  dan kegagalannya baru muncul di peramban pengguna.
+- **Lubang di basis pengetahuan terdeteksi** — data benih Oracle sengaja memuat
+  satu fakta yang dipakai sebagai premis tetapi tidak bisa disimpulkan maupun
+  ditanyakan. Basis seperti itu lolos seluruh batasan tabel dan tetap memberi
+  jawaban; yang terjadi hanyalah satu aturan tidak pernah menyala. Ujinya
+  menuntut lubang itu ditemukan, tepat satu.
 
 Contoh kasus yang dipakai sebagai uji berasal langsung dari lembar tugas mata kuliah:
 
@@ -216,6 +286,8 @@ Contoh kasus yang dipakai sebagai uji berasal langsung dari lembar tugas mata ku
 | Penemuan mesin pencari | `sitemap.xml`, `robots.txt`, kanonik, data terstruktur `LearningResource` | `web/public/` |
 | Pemasangan aplikasi | Manifes web + ikon biasa dan *maskable* | `web/public/` |
 | Konsistensi akhiran baris | Dipaksa LF; CRLF merusak sidik kebijakan keamanan | `.gitattributes` |
+| Akses tanpa penglihatan | Tiap gambar SVG memikul `role="img"` dan keterangan; angkanya juga tersedia sebagai tabel | `web/src/viz.ts` |
+| Konformansi basis data | Oracle Free 23ai dijalankan sebagai service container, skema dipasang dari nol tiap kali | CI, `oracle/run.sh` |
 | Tata kelola | `SECURITY.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `CODEOWNERS`, Dependabot | akar repositori |
 
 Yang **tidak** dijanjikan, karena memang tidak bisa dipenuhi di GitHub Pages:
@@ -249,11 +321,23 @@ ai-atlas/
 │   └── conform/        Implementasi pembanding Go + harness konformansi
 │       ├── aicore/     Algoritma ditulis ulang dari nol dalam Go
 │       └── vectors/    2.266 vektor uji berpola bit, dihasilkan Rust
+├── oracle/             Implementasi ketiga: PL/SQL di atas Oracle Free 23ai
+│   ├── 01_schema.sql          Basis pengetahuan relasional, seluruhnya BINARY_DOUBLE
+│   ├── 02_pkg_ai_core.pks     Spesifikasi paket
+│   ├── 03_pkg_ai_core.pkb     Badan paket — urutan operasinya sama persis dengan Rust
+│   ├── 04_seed_knowledge.sql  Aturan, himpunan kabur, dataset tenis
+│   ├── 05_conformance.sql     Pemeriksa 3.796 pernyataan, per tingkat keterbandingan
+│   ├── 06_tests.sql           60 uji unit, harness-nya ditulis sendiri
+│   ├── run.sh                 Satu perintah: nyalakan, pasang, konformansi, uji
+│   └── tools/                 Pengubah vektor TSV menjadi SQL pemuat
 ├── web/
 │   ├── src/
 │   │   ├── engine.ts   Pembungkus bertipe untuk WebAssembly
-│   │   ├── labs/       Satu berkas per laboratorium
-│   │   │   └── notes.ts  81 definisi, 42 rumus, 26 kekeliruan, 28 rujukan
+│   │   ├── viz.ts      Perangkat visualisasi SVG: garis bilangan, air terjun,
+│   │   │               graf, peta panas, alur bertahap, siklus
+│   │   ├── labs/       Satu berkas per laboratorium, dimuat lewat import()
+│   │   │   ├── registry.ts  Katalog: keterangan eager, mesin lazy
+│   │   │   └── notes.ts     81 definisi, 42 rumus, 26 kekeliruan, 28 rujukan
 │   │   ├── i18n.ts     Dwibahasa ID/EN
 │   │   └── ui.ts       Pembantu DOM, tanpa kerangka kerja
 │   └── index.html

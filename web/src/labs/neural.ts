@@ -12,7 +12,6 @@
 import * as engine from "../engine.js";
 import { T, bi, pick } from "../i18n.js";
 import { buttonRow, card, clear, el, errorNote, fmt, pct, slider, table } from "../ui.js";
-import type { Lab } from "./registry.js";
 
 type DatasetName = "xor" | "and" | "or" | "spiral";
 
@@ -30,16 +29,14 @@ const EPOCHS_PER_FRAME = 8;
 /** Resolusi kisi batas keputusan. Lebih halus berarti lebih berat. */
 const GRID_RESOLUTION = 72;
 
-export const neuralLab: Lab = {
-  slug: "neural-network",
-  session: 9,
-  title: bi("Jaringan Syaraf Tiruan", "Artificial Neural Networks"),
-  blurb: bi(
-    "Jaringan ini dilatih sungguhan di peramban Anda, bukan animasi yang sudah direkam. Perhatikan batas keputusannya melengkung menyesuaikan data, dan perhatikan apa yang terjadi kalau laju belajarnya dinaikkan terlalu jauh.",
-    "This network trains for real in your browser, not a pre-recorded animation. Watch the decision boundary bend to fit the data, and watch what happens when the learning rate goes too high.",
-  ),
-
-  mount(root: HTMLElement): () => void {
+/**
+ * Memasang laboratorium ke dalam elemen yang diberikan.
+ *
+ * Keterangannya -- judul, nomor sesi, penjelasan -- ada di
+ * `labs/registry.ts`, bukan di sini, supaya daftar isi bisa ditampilkan
+ * tanpa mengunduh mesin seluruh laboratorium lebih dulu.
+ */
+export function mount(root: HTMLElement): () => void {
     let datasetName: DatasetName = "spiral";
     let points = 60;
     let noise = 0.04;
@@ -497,5 +494,4 @@ export const neuralLab: Lab = {
       observer.disconnect();
       clear(root);
     };
-  },
-};
+}

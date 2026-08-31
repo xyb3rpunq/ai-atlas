@@ -11,7 +11,6 @@
 import * as engine from "../engine.js";
 import { T, bi, pick } from "../i18n.js";
 import { buttonRow, card, clear, el, errorNote, fmt, slider, table } from "../ui.js";
-import type { Lab } from "./registry.js";
 
 const WIDTH = 31;
 const HEIGHT = 21;
@@ -33,16 +32,14 @@ const ALGORITHMS: { slug: engine.Algorithm; label: string }[] = [
 
 const HEURISTICS: engine.Heuristic[] = ["manhattan", "euclidean", "chebyshev", "zero"];
 
-export const searchLab: Lab = {
-  slug: "search",
-  session: 8,
-  title: bi("Teknik Pencarian", "Search Techniques"),
-  blurb: bi(
-    "Sembilan algoritma di atas peta yang sama. Yang dianimasikan bukan jalurnya, melainkan urutan sel yang diperiksa — karena di situlah perbedaannya. Gambar dinding sendiri, geser titik awal dan tujuan, lalu bandingkan.",
-    "Nine algorithms on one map. What is animated is not the path but the order in which cells are examined — because that is where they differ. Draw your own walls, drag the start and goal, then compare.",
-  ),
-
-  mount(root: HTMLElement): () => void {
+/**
+ * Memasang laboratorium ke dalam elemen yang diberikan.
+ *
+ * Keterangannya -- judul, nomor sesi, penjelasan -- ada di
+ * `labs/registry.ts`, bukan di sini, supaya daftar isi bisa ditampilkan
+ * tanpa mengunduh mesin seluruh laboratorium lebih dulu.
+ */
+export function mount(root: HTMLElement): () => void {
     let grid: engine.Grid = engine.searchMaze(WIDTH, HEIGHT, 2026);
     let start = { x: 0, y: 0 };
     let goal = { x: WIDTH - 1, y: HEIGHT - 1 };
@@ -465,5 +462,4 @@ export const searchLab: Lab = {
       observer.disconnect();
       clear(root);
     };
-  },
-};
+}

@@ -11,7 +11,6 @@
 import * as engine from "../engine.js";
 import { T, bi, pick } from "../i18n.js";
 import { buttonRow, card, clear, el, errorNote, fmt, readout, slider, table } from "../ui.js";
-import type { Lab } from "./registry.js";
 
 /** Sistem contoh: menentukan persen tip dari mutu pelayanan dan makanan. */
 const SYSTEM: engine.FuzzySystem = {
@@ -244,16 +243,14 @@ const METHODS: engine.DefuzzMethod[] = [
   "largest_of_maximum",
 ];
 
-export const fuzzyLab: Lab = {
-  slug: "fuzzy-logic",
-  session: 5,
-  title: bi("Logika Fuzzy", "Fuzzy Logic"),
-  blurb: bi(
-    "Logika tegas memaksa dunia menjadi ya atau tidak. Logika kabur membiarkan “pelayanannya lumayan” bernilai 0,6 sekaligus 0,4 — lalu tetap menghasilkan satu angka yang bisa dipakai. Geser masukannya dan lihat aturan mana yang menyala.",
-    "Crisp logic forces the world into yes or no. Fuzzy logic lets “the service was decent” be 0.6 and 0.4 at once — and still produce a single usable number. Move the inputs and watch which rules fire.",
-  ),
-
-  mount(root: HTMLElement): () => void {
+/**
+ * Memasang laboratorium ke dalam elemen yang diberikan.
+ *
+ * Keterangannya -- judul, nomor sesi, penjelasan -- ada di
+ * `labs/registry.ts`, bukan di sini, supaya daftar isi bisa ditampilkan
+ * tanpa mengunduh mesin seluruh laboratorium lebih dulu.
+ */
+export function mount(root: HTMLElement): () => void {
     const values: Record<string, number> = { Pelayanan: 7, Makanan: 8 };
     let engineName: EngineName = "mamdani";
     let method: engine.DefuzzMethod = "centroid";
@@ -468,5 +465,4 @@ export const fuzzyLab: Lab = {
       observer.disconnect();
       clear(root);
     };
-  },
-};
+}

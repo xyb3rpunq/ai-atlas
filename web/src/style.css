@@ -777,3 +777,104 @@ canvas {
 .refs a:hover {
   color: var(--accent);
 }
+
+/* --------------------------------------------------------------------------
+   Visualisasi
+   --------------------------------------------------------------------------
+   Gambar dibuat dari SVG, jadi warnanya mewarisi variabel tema di atas dan
+   tidak perlu digambar ulang saat terang-gelap berganti. Yang diatur di sini
+   hanya bingkai, keterangan, dan perilakunya di layar sempit.
+   -------------------------------------------------------------------------- */
+
+.viz {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.viz__title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.viz__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* Gambar bisa lebih lebar daripada kolomnya di layar sempit; menggulung ke
+     samping jauh lebih baik daripada mengecilkan teksnya sampai tak terbaca. */
+  min-width: 0;
+  overflow: visible;
+  background: var(--bg-grid);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 0.5rem;
+}
+
+.viz__legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+}
+
+.viz__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.viz__swatch {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 3px;
+  border: 1px solid var(--border-strong);
+  flex: none;
+}
+
+.viz__caption {
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.viz__data {
+  font-size: 0.8rem;
+}
+
+.viz__data > summary {
+  cursor: pointer;
+  color: var(--text-faint);
+  padding: 0.3rem 0;
+}
+
+.viz__data > summary:hover {
+  color: var(--accent);
+}
+
+.viz__data table {
+  margin-top: 0.4rem;
+}
+
+/* Pada layar sempit, teks di dalam SVG mengecil bersama gambarnya sampai tidak
+   terbaca. Di bawah ambang ini gambarnya dibiarkan selebar aslinya dan
+   digulung ke samping, bukan diperkecil terus. */
+@media (width <= 620px) {
+  .viz {
+    overflow-x: auto;
+  }
+
+  .viz__svg {
+    width: 600px;
+    max-width: none;
+  }
+}
