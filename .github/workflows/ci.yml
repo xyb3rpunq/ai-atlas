@@ -43,7 +43,7 @@ jobs:
     name: Rust — format, lint, uji
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Pasang toolchain Rust
         run: |
@@ -78,7 +78,7 @@ jobs:
     name: Keamanan — audit dependensi
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Pasang toolchain Rust
         run: rustup toolchain install stable --profile minimal
@@ -102,7 +102,7 @@ jobs:
     name: Web — tipe, uji, keamanan, anggaran
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Pasang toolchain Rust
         run: |
@@ -160,7 +160,7 @@ jobs:
     name: Konformansi — Rust lawan Go
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Pasang toolchain Rust
         run: rustup toolchain install stable --profile minimal
@@ -241,7 +241,7 @@ jobs:
           --health-timeout 10s
           --health-retries 30
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Pasang toolchain Rust
         run: rustup toolchain install stable --profile minimal
