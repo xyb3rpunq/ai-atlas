@@ -509,3 +509,142 @@ export function neuralDecisionGrid(
     wasm.neural_decision_grid(JSON.stringify(network), min, max, resolution),
   );
 }
+
+// ---------------------------------------------------------------------------
+// Sesi 11 — Sistem Pakar
+// ---------------------------------------------------------------------------
+
+/** Satu premis aturan; `expected: false` berarti premis ingkar. */
+export interface ExpertPremise {
+  fact: string;
+  expected: boolean;
+}
+
+/** Satu aturan JIKA-MAKA. */
+export interface ExpertRule {
+  id: string;
+  premises: ExpertPremise[];
+  connective: "AND" | "OR";
+  conclusion: string;
+  certainty: number;
+  rationale: string;
+}
+
+/** Basis pengetahuan lengkap. */
+export interface KnowledgeBase {
+  name: string;
+  rules: ExpertRule[];
+  /** Fakta yang hanya bisa diketahui dengan bertanya kepada pengguna. */
+  askable: string[];
+}
+
+/** Laporan kesehatan basis pengetahuan. */
+export interface KnowledgeBaseReport {
+  name: string;
+  rules: number;
+  derivable: string[];
+  leaf_facts: string[];
+  /** Premis yang tidak bisa disimpulkan maupun ditanyakan. */
+  unreachable_facts: string[];
+  askable: string[];
+}
+
+/** Satu langkah penalaran runut maju. */
+export interface ExpertStep {
+  order: number;
+  rule_id: string;
+  text: string;
+  conclusion: string;
+  premise_certainty: number;
+  conclusion_certainty: number;
+  support: [string, number][];
+}
+
+/** Hasil penalaran runut maju. */
+export interface ForwardResult {
+  /** Fakta yang benar-benar disimpulkan sistem. */
+  derived: [string, number][];
+  /** Fakta yang berasal dari masukan pengguna. */
+  given: [string, number][];
+  all_facts: [string, number][];
+  steps: ExpertStep[];
+  passes: number;
+}
+
+/**
+ * Bagaimana sebuah tujuan diselesaikan runut mundur.
+ *
+ * Bentuknya bertanda seragam, sehingga satu pemeriksaan `kind` cukup untuk
+ * seluruh varian.
+ */
+export type ProofOutcome =
+  | { kind: "known" }
+  | { kind: "needs_asking" }
+  | { kind: "unprovable" }
+  | { kind: "derived"; rule_id: string };
+
+/** Satu simpul pada pohon pembuktian. */
+export interface ProofNode {
+  goal: string;
+  depth: number;
+  certainty: number;
+  outcome: ProofOutcome;
+  children: ProofNode[];
+}
+
+/** Hasil penalaran runut mundur. */
+export interface BackwardResult {
+  goal: string;
+  certainty: number;
+  proof: ProofNode;
+  /** Fakta yang masih perlu ditanyakan agar penelusuran bisa dilanjutkan. */
+  questions: string[];
+}
+
+/** Basis pengetahuan contoh: diagnosis flu dari studi kasus modul. */
+export function expertSampleKb(): KnowledgeBase {
+  return unwrap<KnowledgeBase>(wasm.expert_sample_kb());
+}
+
+/** Memeriksa kesehatan sebuah basis pengetahuan. */
+export function expertInspectKb(kb: KnowledgeBase): KnowledgeBaseReport {
+  return unwrap<KnowledgeBaseReport>(wasm.expert_inspect_kb(JSON.stringify(kb)));
+}
+
+/** Penalaran runut maju dari fakta yang diketahui. */
+export function expertForward(
+  kb: KnowledgeBase,
+  facts: [string, number][],
+  threshold: number,
+): ForwardResult {
+  return unwrap<ForwardResult>(
+    wasm.expert_forward(JSON.stringify(kb), JSON.stringify(facts), threshold),
+  );
+}
+
+/** Penalaran runut mundur terhadap sebuah tujuan. */
+export function expertBackward(
+  kb: KnowledgeBase,
+  facts: [string, number][],
+  goal: string,
+): BackwardResult {
+  return unwrap<BackwardResult>(
+    wasm.expert_backward(JSON.stringify(kb), JSON.stringify(facts), goal),
+  );
+}
+
+/** Jawaban atas pertanyaan "kenapa aturan ini ada". */
+export function expertWhy(kb: KnowledgeBase, ruleId: string): string {
+  return unwrap<string>(wasm.expert_why(JSON.stringify(kb), ruleId));
+}
+
+/** Jawaban atas pertanyaan "bagaimana kesimpulan ini diperoleh". */
+export function expertHow(
+  kb: KnowledgeBase,
+  facts: [string, number][],
+  fact: string,
+): string[] {
+  return unwrap<string[]>(
+    wasm.expert_how(JSON.stringify(kb), JSON.stringify(facts), fact),
+  );
+}

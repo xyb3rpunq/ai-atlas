@@ -592,6 +592,153 @@ pub fn neural_decision_grid(network_json: &str, min: f64, max: f64, resolution: 
     })
 }
 
+// ---------------------------------------------------------------------------
+// Sesi 11 — Sistem Pakar
+// ---------------------------------------------------------------------------
+
+/// Basis pengetahuan contoh: diagnosis flu dari studi kasus modul.
+#[wasm_bindgen]
+pub fn expert_sample_kb() -> String {
+    ok(ai_core::expert::flu_knowledge_base())
+}
+
+/// Membaca basis pengetahuan lalu melaporkan kesehatannya.
+///
+/// Yang paling berguna di sini adalah daftar fakta yang dipakai sebagai premis
+/// tetapi tidak bisa disimpulkan maupun ditanyakan. Fakta seperti itu diam-diam
+/// dianggap tidak berlaku, sehingga sebagian aturan tidak akan pernah menyala
+/// tanpa ada pesan galat apa pun.
+#[wasm_bindgen]
+pub fn expert_inspect_kb(kb_json: &str) -> String {
+    let kb: ai_core::expert::KnowledgeBase = match serde_json::from_str(kb_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    if let Err(e) = kb.validate() {
+        return err(e);
+    }
+    #[derive(Serialize)]
+    struct Out {
+        name: String,
+        rules: usize,
+        derivable: Vec<String>,
+        leaf_facts: Vec<String>,
+        unreachable_facts: Vec<String>,
+        askable: Vec<String>,
+    }
+    ok(Out {
+        name: kb.name.clone(),
+        rules: kb.rules.len(),
+        derivable: kb.derivable().into_iter().collect(),
+        leaf_facts: kb.leaf_facts().into_iter().collect(),
+        unreachable_facts: kb.unreachable_facts().into_iter().collect(),
+        askable: kb.askable.clone(),
+    })
+}
+
+/// Membangun memori kerja dari daftar pasangan fakta dan keyakinan.
+fn build_memory(facts_json: &str) -> Result<ai_core::expert::WorkingMemory, String> {
+    let pairs: Vec<(String, f64)> = serde_json::from_str(facts_json).map_err(|e| e.to_string())?;
+    let mut memory = ai_core::expert::WorkingMemory::new();
+    for (fact, cf) in pairs {
+        memory.assert(fact, cf).map_err(|e| e.to_string())?;
+    }
+    Ok(memory)
+}
+
+/// Penalaran runut maju.
+///
+/// `facts_json` berbentuk `[["demam",1.0],["batuk",0.8]]`.
+#[wasm_bindgen]
+pub fn expert_forward(kb_json: &str, facts_json: &str, threshold: f64) -> String {
+    let kb: ai_core::expert::KnowledgeBase = match serde_json::from_str(kb_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let memory = match build_memory(facts_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    match ai_core::expert::forward_chain(&kb, &memory) {
+        Ok(result) => {
+            #[derive(Serialize)]
+            struct Out {
+                /// Hanya fakta yang benar-benar disimpulkan sistem.
+                derived: Vec<(String, f64)>,
+                /// Fakta yang berasal dari masukan pengguna.
+                given: Vec<(String, f64)>,
+                all_facts: Vec<(String, f64)>,
+                steps: Vec<ai_core::expert::Step>,
+                passes: usize,
+            }
+            // Memori kerja memuat masukan pengguna dan hasil penalaran
+            // sekaligus. Menampilkan keduanya sebagai "kesimpulan" membuat
+            // sistem terlihat menyimpulkan gejala yang justru diketikkan
+            // penggunanya sendiri, jadi keduanya dipisahkan di sini.
+            let derivable = kb.derivable();
+            let semua = result.memory.conclusions(threshold);
+            let (derived, given): (Vec<_>, Vec<_>) = semua
+                .into_iter()
+                .partition(|(fact, _)| derivable.contains(fact));
+            ok(Out {
+                derived,
+                given,
+                all_facts: result.memory.all(),
+                steps: result.steps.clone(),
+                passes: result.passes,
+            })
+        }
+        Err(e) => err(e),
+    }
+}
+
+/// Penalaran runut mundur terhadap sebuah tujuan.
+#[wasm_bindgen]
+pub fn expert_backward(kb_json: &str, facts_json: &str, goal: &str) -> String {
+    let kb: ai_core::expert::KnowledgeBase = match serde_json::from_str(kb_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let memory = match build_memory(facts_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    match ai_core::expert::backward_chain(&kb, &memory, goal) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+/// Jawaban atas pertanyaan "kenapa aturan ini ada".
+#[wasm_bindgen]
+pub fn expert_why(kb_json: &str, rule_id: &str) -> String {
+    let kb: ai_core::expert::KnowledgeBase = match serde_json::from_str(kb_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    match ai_core::expert::explain_why(&kb, rule_id) {
+        Some(v) => ok(v),
+        None => err(format!("aturan tidak ditemukan: {rule_id}")),
+    }
+}
+
+/// Jawaban atas pertanyaan "bagaimana kesimpulan ini diperoleh".
+#[wasm_bindgen]
+pub fn expert_how(kb_json: &str, facts_json: &str, fact: &str) -> String {
+    let kb: ai_core::expert::KnowledgeBase = match serde_json::from_str(kb_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let memory = match build_memory(facts_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    match ai_core::expert::forward_chain(&kb, &memory) {
+        Ok(result) => ok(ai_core::expert::explain_how(&result, fact)),
+        Err(e) => err(e),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -909,5 +1056,103 @@ mod tests {
         let v: serde_json::Value = serde_json::from_str(&tiga).unwrap();
         let net3 = serde_json::to_string(&v["ok"]["network"]).unwrap();
         assert!(neural_decision_grid(&net3, -1.0, 1.0, 20).contains("err"));
+    }
+
+    fn kb_uji() -> String {
+        let out = expert_sample_kb();
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        serde_json::to_string(&v["ok"]).unwrap()
+    }
+
+    const GEJALA_FLU: &str = r#"[["demam",1.0],["pilek",1.0],["batuk",1.0]]"#;
+
+    #[test]
+    fn basis_pengetahuan_contoh_lewat_jembatan() {
+        let out = expert_sample_kb();
+        assert!(out.contains("Dokter Virtual"), "{out}");
+        assert!(out.contains("R1"));
+    }
+
+    #[test]
+    fn pemeriksaan_basis_pengetahuan() {
+        let out = expert_inspect_kb(&kb_uji());
+        assert!(out.contains(r#""rules":6"#), "{out}");
+        // Basis contoh tidak boleh punya fakta yang tak terjangkau.
+        assert!(out.contains(r#""unreachable_facts":[]"#), "{out}");
+        assert!(out.contains("leaf_facts"));
+        assert!(expert_inspect_kb("bukan").contains("err"));
+
+        let rusak = r#"{"name":"x","rules":[],"askable":[]}"#;
+        assert!(expert_inspect_kb(rusak).contains("err"));
+    }
+
+    #[test]
+    fn runut_maju_lewat_jembatan() {
+        let out = expert_forward(&kb_uji(), GEJALA_FLU, 0.2);
+        assert!(!out.contains(r#""err""#), "{out}");
+        assert!(out.contains("flu"), "{out}");
+        assert!(out.contains("steps"));
+        assert!(out.contains("passes"));
+    }
+
+    #[test]
+    fn runut_maju_memisahkan_kesimpulan_dari_masukan() {
+        // Gejala yang diketikkan pengguna tidak boleh muncul sebagai
+        // "kesimpulan"; sistem yang menyimpulkan masukannya sendiri terlihat
+        // pintar padahal tidak melakukan apa pun.
+        let out = expert_forward(&kb_uji(), GEJALA_FLU, 0.2);
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        let derived = v["ok"]["derived"].as_array().unwrap();
+        let given = v["ok"]["given"].as_array().unwrap();
+
+        let nama = |arr: &Vec<serde_json::Value>| -> Vec<String> {
+            arr.iter()
+                .map(|p| p[0].as_str().unwrap().to_string())
+                .collect()
+        };
+        assert!(nama(derived).contains(&"flu".to_string()));
+        assert!(!nama(derived).contains(&"demam".to_string()));
+        assert!(nama(given).contains(&"demam".to_string()));
+        assert!(nama(given).contains(&"batuk".to_string()));
+    }
+
+    #[test]
+    fn runut_maju_menolak_masukan_salah() {
+        assert!(expert_forward("bukan", GEJALA_FLU, 0.2).contains("err"));
+        assert!(expert_forward(&kb_uji(), "bukan", 0.2).contains("err"));
+        // Keyakinan di luar rentang harus ditolak, bukan dijepit diam-diam.
+        assert!(expert_forward(&kb_uji(), r#"[["demam",9.0]]"#, 0.2).contains("err"));
+    }
+
+    #[test]
+    fn runut_mundur_lewat_jembatan() {
+        let out = expert_backward(&kb_uji(), GEJALA_FLU, "flu");
+        assert!(!out.contains(r#""err""#), "{out}");
+        assert!(out.contains(r#""goal":"flu""#), "{out}");
+        assert!(out.contains("proof"));
+
+        // Dari memori kosong, sistem harus tahu apa yang perlu ditanyakan.
+        let kosong = expert_backward(&kb_uji(), "[]", "flu");
+        assert!(kosong.contains("questions"));
+        assert!(kosong.contains("demam"), "{kosong}");
+    }
+
+    #[test]
+    fn runut_mundur_menolak_masukan_salah() {
+        assert!(expert_backward("bukan", "[]", "flu").contains("err"));
+        assert!(expert_backward(&kb_uji(), "bukan", "flu").contains("err"));
+    }
+
+    #[test]
+    fn penjelasan_lewat_jembatan() {
+        let why = expert_why(&kb_uji(), "R1");
+        assert!(why.contains("JIKA"), "{why}");
+        assert!(expert_why(&kb_uji(), "R99").contains("err"));
+        assert!(expert_why("bukan", "R1").contains("err"));
+
+        let how = expert_how(&kb_uji(), GEJALA_FLU, "flu");
+        assert!(how.contains("R1"), "{how}");
+        assert!(expert_how("bukan", GEJALA_FLU, "flu").contains("err"));
+        assert!(expert_how(&kb_uji(), "bukan", "flu").contains("err"));
     }
 }

@@ -125,8 +125,16 @@ export function slider(options: SliderOptions): HTMLElement {
   });
 }
 
-/** Kartu bersudut membulat dengan judul kecil di atasnya. */
-export function card(title: string | null, ...children: (Node | string)[]): HTMLElement {
+/**
+ * Kartu bersudut membulat dengan judul kecil di atasnya.
+ *
+ * Anak bernilai `null` dilewati, sehingga bagian yang muncul bersyarat bisa
+ * ditulis sebagai ekspresi biasa tanpa menyusun larik terpisah lebih dulu.
+ */
+export function card(
+  title: string | null,
+  ...children: (Node | string | null | undefined)[]
+): HTMLElement {
   return el("section", {
     class: "card",
     children: [

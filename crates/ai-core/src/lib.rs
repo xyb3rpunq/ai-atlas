@@ -24,6 +24,7 @@
 //! | 5-6 | Logika Fuzzy | [`fuzzy`] |
 //! | 8 | Teknik Pencarian | [`search`] |
 //! | 9 | Jaringan Syaraf Tiruan | [`neural`] |
+//! | 11 | Sistem Pakar | [`expert`] |
 //! | — | Penunjang: keacakan deterministik | [`rng`] |
 //! | — | Penunjang: pertukaran pecahan bit-eksak | [`fx`] |
 
@@ -33,6 +34,7 @@
 
 pub mod bayes;
 pub mod certainty;
+pub mod expert;
 pub mod fuzzy;
 pub mod fx;
 pub mod neural;
@@ -92,6 +94,12 @@ pub const SESSIONS: &[SessionInfo] = &[
         module: "neural",
         title_id: "Jaringan Syaraf Tiruan",
         title_en: "Artificial Neural Networks",
+    },
+    SessionInfo {
+        session: 11,
+        module: "expert",
+        title_id: "Sistem Pakar",
+        title_en: "Expert Systems",
     },
 ];
 

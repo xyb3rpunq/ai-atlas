@@ -11,6 +11,7 @@ import { bi } from "../i18n.js";
 import { bayesLab } from "./bayes.js";
 import { certaintyLab } from "./certainty.js";
 import { fuzzyLab } from "./fuzzy.js";
+import { expertLab } from "./expert.js";
 import { neuralLab } from "./neural.js";
 import { searchLab } from "./search.js";
 
@@ -39,7 +40,14 @@ export interface PlannedLab {
 }
 
 /** Sesi yang sudah bisa dijalankan. */
-export const LABS: Lab[] = [certaintyLab, bayesLab, fuzzyLab, searchLab, neuralLab];
+export const LABS: Lab[] = [
+  certaintyLab,
+  bayesLab,
+  fuzzyLab,
+  searchLab,
+  neuralLab,
+  expertLab,
+];
 
 /** Seluruh sesi silabus, termasuk yang belum terimplementasi. */
 export const SYLLABUS: { session: number; title: Bilingual; slug?: string }[] = [
@@ -53,7 +61,7 @@ export const SYLLABUS: { session: number; title: Bilingual; slug?: string }[] = 
   { session: 8, title: searchLab.title, slug: searchLab.slug },
   { session: 9, title: neuralLab.title, slug: neuralLab.slug },
   { session: 10, title: bi("Pemrosesan Bahasa Alami", "Natural Language Processing") },
-  { session: 11, title: bi("Sistem Pakar", "Expert Systems") },
+  { session: 11, title: expertLab.title, slug: expertLab.slug },
   { session: 12, title: bi("Sains Data & Big Data", "Data Science & Big Data") },
   { session: 13, title: bi("Machine Learning", "Machine Learning") },
   { session: 14, title: bi("Robotika", "Robotics") },

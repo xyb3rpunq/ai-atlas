@@ -89,7 +89,7 @@ Penggolongan ini menentukan bentuk harness Go dan PL/SQL nanti. Tanpa itu, selur
 | 08 | Teknik Pencarian | **Sembilan algoritma** diadu di satu peta: BFS, DFS, DLS, IDDFS, UCS, Greedy, **A\***, hill climbing, annealing | ✅ |
 | 09 | Jaringan Syaraf Tiruan | Perceptron, **backpropagation** yang diverifikasi gradien numerik, batas keputusan & kurva galat langsung | ✅ |
 | 10 | Pemrosesan Bahasa Alami | Tokenisasi, stemming Bahasa Indonesia, TF-IDF | ⏳ |
-| 11 | Sistem Pakar | **Forward & backward chaining**, fasilitas penjelasan | ⏳ |
+| 11 | Sistem Pakar | **Runut maju & mundur** pada basis pengetahuan yang sama, pemangkasan pertanyaan, fasilitas penjelasan | ✅ |
 | 12 | Sains Data & Big Data | Statistik, normalisasi, deteksi pencilan, matriks konfusi | ⏳ |
 | 13 | Machine Learning | KNN, K-Means, pohon keputusan ID3, regresi | ⏳ |
 | 14 | Robotika | Kinematika, kendali PID, medan potensial | ⏳ |
@@ -148,13 +148,14 @@ Setiap fungsi publik punya uji. Bukan uji jalur bahagia saja — uji nilai batas
 | `bayes.rs` | 21 | 36 |
 | `fuzzy.rs` | 24 | 42 |
 | `search.rs` | 22 | 44 |
-| `neural.rs` | 30 | 40 |
+| `neural.rs` | 32 | 42 |
+| `expert.rs` | 26 | 29 |
 | `fx.rs` | 8 | 17 |
 | `rng.rs` | 9 | 16 |
 | `lib.rs` | 2 | 4 |
-| `ai-wasm/lib.rs` | 20 | 28 |
+| `ai-wasm/lib.rs` | 26 | 36 |
 | `web/src/ui.ts` | 11 | 15 |
-| **Total** | **156** | **283** |
+| **Total** | **188** | **326** |
 
 Beberapa uji yang menahan seluruh proyek ini tetap jujur:
 
@@ -205,6 +206,7 @@ ai-atlas/
 │   │       ├── fuzzy.rs       Sesi 5-6 — Logika Fuzzy
 │   │       ├── search.rs      Sesi 8 — Teknik Pencarian
 │   │       ├── neural.rs      Sesi 9 — Jaringan Syaraf Tiruan
+│   │       ├── expert.rs      Sesi 11 — Sistem Pakar
 │   │       ├── fx.rs          Pertukaran pecahan bit-eksak
 │   │       └── rng.rs         SplitMix64 deterministik
 │   └── ai-wasm/        Jembatan wasm-bindgen. Amplop JSON ok/err.
