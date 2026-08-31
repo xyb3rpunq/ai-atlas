@@ -90,6 +90,11 @@ jobs:
 
       - run: npm ci
 
+      # Modul WebAssembly harus ada sebelum pemeriksaan tipe, karena
+      # `web/src/engine.ts` mengimpor deklarasi tipe yang dihasilkan wasm-pack.
+      - name: Bangun WebAssembly
+        run: npm run wasm
+
       - name: Periksa tipe
         run: npm run typecheck
 

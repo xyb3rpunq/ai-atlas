@@ -33,7 +33,9 @@ let ready: Promise<void> | null = null;
  * sekali dan pemanggil berikutnya menunggu janji yang sama.
  */
 export function load(): Promise<void> {
-  ready ??= init({ module_or_path: wasmUrl }).then(() => undefined);
+  if (ready === null) {
+    ready = init({ module_or_path: wasmUrl }).then(() => undefined);
+  }
   return ready;
 }
 
