@@ -1,0 +1,41 @@
+# Pembaruan dependensi otomatis.
+#
+# Proyek ini tidak punya dependensi saat berjalan, jadi yang dipantau adalah
+# rantai alat: crate Rust, paket pengembangan npm, dan aksi GitHub. Pembaruan
+# dikelompokkan agar tidak membanjiri riwayat dengan satu PR per paket.
+#
+# .Deckyx
+
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      rust-minor:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "cargo"
+
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      npm-dev:
+        dependency-type: development
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "npm"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"

@@ -180,6 +180,93 @@ pub fn naive_bayes_predict(samples_json: &str, query_json: &str, alpha: f64) -> 
     }
 }
 
+// ---------------------------------------------------------------------------
+// Sesi 5 & 6 — Logika Fuzzy
+// ---------------------------------------------------------------------------
+
+/// Derajat keanggotaan sebuah nilai pada satu fungsi keanggotaan.
+///
+/// `set_json` memakai bentuk bertanda, mis.
+/// `{"kind":"triangular","a":0,"b":5,"c":10}`.
+#[wasm_bindgen]
+pub fn fuzzy_degree(set_json: &str, x: f64) -> String {
+    let set: ai_core::fuzzy::Membership = match serde_json::from_str(set_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    if let Err(e) = set.validate() {
+        return err(e);
+    }
+    ok(set.degree(x))
+}
+
+/// Kurva sebuah fungsi keanggotaan, tercuplik seragam pada semesta.
+#[wasm_bindgen]
+pub fn fuzzy_curve(set_json: &str, min: f64, max: f64, samples: usize) -> String {
+    let set: ai_core::fuzzy::Membership = match serde_json::from_str(set_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    if let Err(e) = set.validate() {
+        return err(e);
+    }
+    match ai_core::fuzzy::sample_universe(min, max, samples) {
+        Ok(xs) => {
+            let ys: Vec<f64> = xs.iter().map(|x| set.degree(*x)).collect();
+            #[derive(Serialize)]
+            struct Curve {
+                xs: Vec<f64>,
+                ys: Vec<f64>,
+            }
+            ok(Curve { xs, ys })
+        }
+        Err(e) => err(e),
+    }
+}
+
+/// Inferensi kabur lengkap.
+///
+/// `engine` menerima `"mamdani"`, `"sugeno"`, atau `"tsukamoto"`.
+/// `method` hanya dipakai Mamdani: `"centroid"`, `"bisector"`,
+/// `"mean_of_maximum"`, `"smallest_of_maximum"`, `"largest_of_maximum"`.
+#[wasm_bindgen]
+pub fn fuzzy_infer(
+    system_json: &str,
+    inputs_json: &str,
+    engine: &str,
+    method: &str,
+    samples: usize,
+) -> String {
+    let system: ai_core::fuzzy::FuzzySystem = match serde_json::from_str(system_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let inputs: Vec<(String, f64)> = match serde_json::from_str(inputs_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let result = match engine.to_ascii_lowercase().as_str() {
+        "mamdani" => {
+            let m = match method.to_ascii_lowercase().as_str() {
+                "centroid" => ai_core::fuzzy::Defuzzifier::Centroid,
+                "bisector" => ai_core::fuzzy::Defuzzifier::Bisector,
+                "mean_of_maximum" | "mom" => ai_core::fuzzy::Defuzzifier::MeanOfMaximum,
+                "smallest_of_maximum" | "som" => ai_core::fuzzy::Defuzzifier::SmallestOfMaximum,
+                "largest_of_maximum" | "lom" => ai_core::fuzzy::Defuzzifier::LargestOfMaximum,
+                other => return err(format!("metode defuzzifikasi tidak dikenal: {other}")),
+            };
+            system.infer_mamdani(&inputs, m, samples)
+        }
+        "sugeno" => system.infer_sugeno(&inputs),
+        "tsukamoto" => system.infer_tsukamoto(&inputs),
+        other => return err(format!("mesin inferensi tidak dikenal: {other}")),
+    };
+    match result {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -259,5 +346,86 @@ mod tests {
         assert!(naive_bayes_predict("bukan", r#"["a"]"#, 1.0).contains("err"));
         assert!(naive_bayes_predict(samples, "bukan", 1.0).contains("err"));
         assert!(naive_bayes_predict(samples, r#"["Mendung"]"#, 1.0).contains("err"));
+    }
+
+    #[test]
+    fn fuzzy_derajat_lewat_jembatan() {
+        let seg = r#"{"kind":"triangular","a":0,"b":5,"c":10}"#;
+        assert!(fuzzy_degree(seg, 5.0).contains("1"));
+        assert!(fuzzy_degree(seg, 2.5).contains("0.5"));
+        assert!(fuzzy_degree("bukan json", 1.0).contains("err"));
+        // Titik tidak terurut ditolak, bukan diam-diam dihitung.
+        assert!(fuzzy_degree(r#"{"kind":"triangular","a":9,"b":1,"c":10}"#, 5.0).contains("err"));
+    }
+
+    #[test]
+    fn fuzzy_kurva_lewat_jembatan() {
+        let seg = r#"{"kind":"triangular","a":0,"b":5,"c":10}"#;
+        let out = fuzzy_curve(seg, 0.0, 10.0, 11);
+        assert!(out.contains("xs"), "{out}");
+        assert!(out.contains("ys"));
+        assert!(fuzzy_curve(seg, 10.0, 0.0, 11).contains("err"));
+        assert!(fuzzy_curve(seg, 0.0, 10.0, 1).contains("err"));
+        assert!(fuzzy_curve("{}", 0.0, 10.0, 11).contains("err"));
+    }
+
+    /// Sistem minimal dua aturan untuk menguji jembatan inferensi.
+    fn sistem_uji() -> String {
+        r#"{
+          "inputs":[{"name":"X","min":0,"max":10,"sets":[
+            {"name":"Rendah","membership":{"kind":"trapezoidal","a":0,"b":0,"c":2,"d":5}},
+            {"name":"Tinggi","membership":{"kind":"trapezoidal","a":5,"b":8,"c":10,"d":10}}
+          ]}],
+          "output":{"name":"Y","min":0,"max":100,"sets":[
+            {"name":"Kecil","membership":{"kind":"triangular","a":0,"b":0,"c":50}},
+            {"name":"Besar","membership":{"kind":"triangular","a":50,"b":100,"c":100}}
+          ]},
+          "rules":[
+            {"antecedents":[{"variable":"X","set":"Rendah"}],"connective":"AND",
+             "consequent_set":"Kecil","consequent_value":10,"weight":1},
+            {"antecedents":[{"variable":"X","set":"Tinggi"}],"connective":"AND",
+             "consequent_set":"Besar","consequent_value":90,"weight":1}
+          ]
+        }"#
+        .to_string()
+    }
+
+    #[test]
+    fn fuzzy_inferensi_tiga_mesin() {
+        let s = sistem_uji();
+        for mesin in ["mamdani", "sugeno", "tsukamoto"] {
+            let out = fuzzy_infer(&s, r#"[["X",9.0]]"#, mesin, "centroid", 101);
+            assert!(out.contains(r#""crisp""#), "{mesin}: {out}");
+            assert!(!out.contains("err"), "{mesin}: {out}");
+        }
+    }
+
+    #[test]
+    fn fuzzy_inferensi_menolak_masukan_salah() {
+        let s = sistem_uji();
+        assert!(fuzzy_infer(&s, r#"[["X",9.0]]"#, "entah", "centroid", 101).contains("err"));
+        assert!(fuzzy_infer(&s, r#"[["X",9.0]]"#, "mamdani", "entah", 101).contains("err"));
+        assert!(fuzzy_infer("{}", r#"[["X",9.0]]"#, "mamdani", "centroid", 101).contains("err"));
+        assert!(fuzzy_infer(&s, "bukan", "mamdani", "centroid", 101).contains("err"));
+        // Variabel yang tidak diberi nilai harus menghasilkan galat, bukan nol diam.
+        assert!(fuzzy_infer(&s, "[]", "mamdani", "centroid", 101).contains("err"));
+    }
+
+    #[test]
+    fn fuzzy_lima_metode_defuzzifikasi_dikenali() {
+        let s = sistem_uji();
+        for m in [
+            "centroid",
+            "bisector",
+            "mean_of_maximum",
+            "mom",
+            "smallest_of_maximum",
+            "som",
+            "largest_of_maximum",
+            "lom",
+        ] {
+            let out = fuzzy_infer(&s, r#"[["X",9.0]]"#, "mamdani", m, 101);
+            assert!(!out.contains("err"), "{m}: {out}");
+        }
     }
 }

@@ -21,6 +21,7 @@
 //! |------|-------|-------|
 //! | 3 | Ketidakpastian | [`certainty`] |
 //! | 4 | Probabilitas Bayesian | [`bayes`] |
+//! | 5-6 | Logika Fuzzy | [`fuzzy`] |
 //! | — | Penunjang: keacakan deterministik | [`rng`] |
 //! | — | Penunjang: pertukaran pecahan bit-eksak | [`fx`] |
 
@@ -30,6 +31,7 @@
 
 pub mod bayes;
 pub mod certainty;
+pub mod fuzzy;
 pub mod fx;
 pub mod rng;
 
@@ -62,6 +64,18 @@ pub const SESSIONS: &[SessionInfo] = &[
         module: "bayes",
         title_id: "Probabilitas Bayesian",
         title_en: "Bayesian Probability",
+    },
+    SessionInfo {
+        session: 5,
+        module: "fuzzy",
+        title_id: "Logika Fuzzy I",
+        title_en: "Fuzzy Logic I",
+    },
+    SessionInfo {
+        session: 6,
+        module: "fuzzy",
+        title_id: "Logika Fuzzy II",
+        title_en: "Fuzzy Logic II",
     },
 ];
 

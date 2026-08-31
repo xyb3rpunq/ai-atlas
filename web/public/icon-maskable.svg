@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="AI ATLAS">
+  <rect width="512" height="512" fill="#0a0e14"/>
+  <g stroke="#4dd4c8" stroke-width="15" fill="none" opacity=".55">
+    <path d="M256 178 154 348M256 178l102 170M154 348h204"/>
+  </g>
+  <g fill="#4dd4c8">
+    <circle cx="256" cy="178" r="37"/>
+    <circle cx="154" cy="348" r="37"/>
+    <circle cx="358" cy="348" r="37"/>
+  </g>
+</svg>

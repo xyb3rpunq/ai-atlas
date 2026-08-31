@@ -1,0 +1,14 @@
+# Akhiran baris disamakan menjadi LF di dalam repositori.
+#
+# Ini bukan soal selera. Sidik SHA-256 untuk kebijakan keamanan konten dihitung
+# dari isi skrip sebaris; berkas yang tersimpan dengan CRLF menghasilkan sidik
+# berbeda dari yang dihitung peramban, sehingga skripnya diblokir di produksi.
+#
+# .Deckyx
+
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.wasm binary

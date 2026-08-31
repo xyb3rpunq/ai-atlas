@@ -1,8 +1,10 @@
-# AI ATLAS — uji, build, terbitkan.
+# AI ATLAS — uji, audit, build, terbitkan.
 #
-# Alur ini menegakkan tiga hal: seluruh uji Rust dan TypeScript lolos, gaya kode
-# bersih tanpa peringatan, dan ukuran hasil build tidak melewati anggaran.
-# Penerbitan ke GitHub Pages hanya berjalan bila ketiganya lolos.
+# Gerbang yang harus dilewati sebelum apa pun sampai ke pengguna:
+#   1. Rust     — format, clippy tanpa peringatan, seluruh uji, dokumentasi.
+#   2. Keamanan — audit kerentanan crate dan paket npm.
+#   3. Web      — periksa tipe, uji, build, kebijakan keamanan konten, anggaran ukuran.
+#   4. Terbit   — hanya bila ketiganya lolos, dan hanya dari `main`.
 #
 # .Deckyx
 
@@ -14,6 +16,10 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    # Audit kerentanan mingguan, supaya cacat yang baru diumumkan tetap
+    # ketahuan walau tidak ada perubahan kode.
+    - cron: "17 3 * * 1"
 
 permissions:
   contents: read
@@ -28,10 +34,10 @@ env:
 
 jobs:
   rust:
-    name: Rust — uji & lint
+    name: Rust — format, lint, uji
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Pasang toolchain Rust
         run: |
@@ -57,11 +63,40 @@ jobs:
       - name: Uji
         run: cargo test --workspace --verbose
 
-  web:
-    name: Web — tipe, uji, anggaran
+      - name: Dokumentasi lengkap tanpa pranala rusak
+        env:
+          RUSTDOCFLAGS: -D warnings -D rustdoc::broken_intra_doc_links
+        run: cargo doc --workspace --no-deps
+
+  security:
+    name: Keamanan — audit dependensi
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+
+      - name: Pasang toolchain Rust
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Audit crate
+        uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Audit paket npm
+        # Seluruh paket npm di sini hanya dipakai saat pengembangan dan tidak
+        # ikut terkirim ke pengguna, tetapi kerentanan berat tetap ditolak.
+        run: npm audit --audit-level=high
+
+  web:
+    name: Web — tipe, uji, keamanan, anggaran
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
 
       - name: Pasang toolchain Rust
         run: |
@@ -85,7 +120,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - run: npm ci
@@ -101,8 +136,11 @@ jobs:
       - name: Uji TypeScript
         run: npm run test
 
-      - name: Build
+      - name: Build produksi
         run: npm run build
+
+      - name: Verifikasi hasil build
+        run: node scripts/verify-dist.mjs
 
       - name: Anggaran ukuran
         run: npm run budget
@@ -114,8 +152,8 @@ jobs:
 
   deploy:
     name: Terbitkan ke GitHub Pages
-    needs: [rust, web]
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: [rust, security, web]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       pages: write

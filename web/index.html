@@ -23,7 +23,22 @@
     <meta property="og:url" content="https://xyb3rpunq.github.io/ai-atlas/" />
     <meta name="twitter:card" content="summary_large_image" />
 
+    <!-- GitHub Pages tidak bisa mengirim tajuk khusus, jadi kebijakan keamanan
+         konten dipasang lewat meta. Situs ini tidak memuat apa pun dari luar,
+         sehingga seluruh sumber dikunci ke asal sendiri.
+
+         `frame-ancestors` sengaja tidak dicantumkan: arahan itu diabaikan bila
+         dikirim lewat meta dan hanya menghasilkan galat konsol. Lihat
+         SECURITY.md. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-REPLACE_BOOT_HASH'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; upgrade-insecure-requests"
+    />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+
     <link rel="canonical" href="https://xyb3rpunq.github.io/ai-atlas/" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./icon.svg" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0e14'/%3E%3Ccircle cx='16' cy='9' r='3' fill='%234dd4c8'/%3E%3Ccircle cx='8' cy='22' r='3' fill='%234dd4c8'/%3E%3Ccircle cx='24' cy='22' r='3' fill='%234dd4c8'/%3E%3Cpath d='M16 12 8 19M16 12l8 7M8 22h16' stroke='%234dd4c8' stroke-width='1.6' fill='none' opacity='.65'/%3E%3C/svg%3E" />
 
     <script>
@@ -57,6 +72,44 @@
         </p>
       </noscript>
     </div>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "LearningResource",
+        "name": "AI ATLAS",
+        "alternateName": "Laboratorium Kecerdasan Buatan Klasik",
+        "description": "Empat belas laboratorium interaktif yang mengimplementasikan algoritma kecerdasan buatan klasik dari nol dengan Rust dan WebAssembly.",
+        "url": "https://xyb3rpunq.github.io/ai-atlas/",
+        "inLanguage": ["id", "en"],
+        "isAccessibleForFree": true,
+        "learningResourceType": "Interactive simulation",
+        "educationalLevel": "Higher education",
+        "teaches": [
+          "Certainty factor",
+          "Bayesian probability",
+          "Fuzzy logic",
+          "Heuristic search",
+          "Artificial neural networks",
+          "Expert systems",
+          "Machine learning"
+        ],
+        "license": "https://opensource.org/licenses/MIT",
+        "author": {
+          "@type": "Person",
+          "name": "Daniel Hutajulu",
+          "alternateName": ".Deckyx",
+          "url": "https://github.com/xyb3rpunq"
+        },
+        "isBasedOn": {
+          "@type": "Course",
+          "name": "IND323 Artificial Intelligence",
+          "provider": {
+            "@type": "CollegeOrUniversity",
+            "name": "Universitas Esa Unggul"
+          }
+        }
+      }
+    </script>
     <script type="module" src="./src/main.ts"></script>
   </body>
 </html>

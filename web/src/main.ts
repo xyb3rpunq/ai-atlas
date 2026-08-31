@@ -336,6 +336,22 @@ async function start(): Promise<void> {
   render();
 }
 
+/**
+ * Mendaftarkan pekerja layanan supaya laboratorium tetap bisa dibuka tanpa
+ * jaringan. Kegagalan pendaftaran sengaja ditelan: situsnya tetap berfungsi
+ * penuh saat daring, jadi ini peningkatan, bukan syarat.
+ */
+function registerServiceWorker(): void {
+  if (!("serviceWorker" in navigator)) return;
+  globalThis.addEventListener("load", () => {
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {
+      /* Luring tidak tersedia; tidak ada yang perlu dilaporkan ke pengguna. */
+    });
+  });
+}
+
+registerServiceWorker();
+
 void start();
 
 /** Diekspor untuk keperluan pengujian rute. */

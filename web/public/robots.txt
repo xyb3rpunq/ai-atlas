@@ -1,0 +1,5 @@
+# AI ATLAS — .Deckyx
+User-agent: *
+Allow: /
+
+Sitemap: https://xyb3rpunq.github.io/ai-atlas/sitemap.xml

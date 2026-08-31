@@ -69,8 +69,8 @@ Karena itu seluruh vektor uji lintas bahasa memakai **16 digit heksadesimal pola
 | 02 | Agen Cerdas & Ruang Keadaan | Dunia penyedot debu, empat jenis agen | ⏳ |
 | 03 | Ketidakpastian | **Certainty Factor MYCIN**, MB/MD, kombinasi paralel & berantai | ✅ |
 | 04 | Probabilitas Bayesian | **Teorema Bayes**, Naive Bayes, diagram 1.000 kasus | ✅ |
-| 05 | Logika Fuzzy I | Fungsi keanggotaan, operasi himpunan kabur | ⏳ |
-| 06 | Logika Fuzzy II | Inferensi Mamdani, Sugeno, Tsukamoto, 5 metode defuzzifikasi | ⏳ |
+| 05 | Logika Fuzzy I | **Enam bentuk fungsi keanggotaan**, operasi Zadeh & produk, potongan alfa | ✅ |
+| 06 | Logika Fuzzy II | **Mamdani, Sugeno, Tsukamoto** berdampingan, 5 metode defuzzifikasi | ✅ |
 | 07 | Representasi Pengetahuan | Logika proposisi, resolusi, jaringan semantik, bingkai | ⏳ |
 | 08 | Teknik Pencarian | BFS, DFS, UCS, Greedy, **A\***, hill climbing, simulated annealing | ⏳ |
 | 09 | Jaringan Syaraf Tiruan | Perceptron, **backpropagation**, kurva galat langsung | ⏳ |
@@ -88,9 +88,10 @@ Batas ini diperiksa otomatis di CI. Build gagal kalau terlampaui — bukan sekad
 
 | Metrik | Anggaran | Terukur |
 |--------|---------:|--------:|
-| WebAssembly (gzip) | ≤ 400 KB | **56,7 KB** |
-| JavaScript (gzip) | ≤ 60 KB | **8,5 KB** |
-| CSS (gzip) | ≤ 20 KB | **2,9 KB** |
+| WebAssembly (gzip) | ≤ 400 KB | **77,5 KB** |
+| JavaScript (gzip) | ≤ 60 KB | **11,0 KB** |
+| CSS (gzip) | ≤ 20 KB | **2,8 KB** |
+| Total muat pertama (gzip) | ≤ 460 KB | **97,1 KB** |
 | Dependensi saat berjalan | 0 | **0** |
 
 Tidak ada React, tidak ada kerangka kerja, tidak ada CDN. Seluruh antarmukanya hanya beberapa lusin simpul DOM, jadi membangunnya langsung lebih ringan daripada memuat pustaka mana pun.
@@ -130,16 +131,38 @@ Setiap fungsi publik punya uji. Bukan uji jalur bahagia saja — uji nilai batas
 | Berkas | Fungsi publik | Uji |
 |--------|--------------:|----:|
 | `certainty.rs` | 9 | 26 |
-| `bayes.rs` | 20 | 34 |
+| `bayes.rs` | 21 | 36 |
+| `fuzzy.rs` | 24 | 40 |
 | `fx.rs` | 8 | 17 |
 | `rng.rs` | 9 | 16 |
-| `ai-wasm/lib.rs` | 9 | 9 |
-| **Total** | **55** | **120** |
+| `lib.rs` | 2 | 4 |
+| `ai-wasm/lib.rs` | 12 | 14 |
+| `web/src/ui.ts` | 11 | 15 |
+| **Total** | **96** | **173** |
 
 Contoh kasus yang dipakai sebagai uji berasal langsung dari lembar tugas mata kuliah:
 
 - **Tugas Sesi 3** — MB[Cacar, Bintik] = 0,8 dan MD = 0,01 → CF = 0,79
 - **Tugas Pertemuan 5** — 20% berita hoaks, 90% hoaks berjudul provokatif, 30% non-hoaks juga → P(hoaks \| provokatif) = 3/7 ≈ 42,86%
+
+## Kesiapan produksi
+
+| Aspek | Penerapan | Ditegakkan di |
+|---|---|---|
+| Kebijakan keamanan konten | Sidik SHA-256 dihitung otomatis untuk tiap skrip sebaris; `'unsafe-inline'` dan `'unsafe-eval'` ditolak | `scripts/csp.mjs` |
+| Verifikasi hasil build | Berkas wajib, rujukan aset, jalur dasar, manifes, peta sumber | `scripts/verify-dist.mjs` |
+| Anggaran ukuran | Build gagal bila terlampaui | `scripts/budget.mjs` |
+| Audit kerentanan | `rustsec/audit-check` + `npm audit`, mingguan lewat cron | CI |
+| Penggunaan luring | Pekerja layanan dengan strategi berbeda per jenis aset | `web/public/sw.js` |
+| Penemuan mesin pencari | `sitemap.xml`, `robots.txt`, kanonik, data terstruktur `LearningResource` | `web/public/` |
+| Pemasangan aplikasi | Manifes web + ikon biasa dan *maskable* | `web/public/` |
+| Konsistensi akhiran baris | Dipaksa LF; CRLF merusak sidik kebijakan keamanan | `.gitattributes` |
+| Tata kelola | `SECURITY.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `CODEOWNERS`, Dependabot | akar repositori |
+
+Yang **tidak** dijanjikan, karena memang tidak bisa dipenuhi di GitHub Pages:
+perlindungan penyematan lewat `frame-ancestors` memerlukan tajuk tanggapan HTTP
+yang tidak bisa diatur di sana. Alasan mengapa risikonya dapat diterima ada di
+[SECURITY.md](SECURITY.md) — bukan disembunyikan.
 
 ## Struktur direktori
 
@@ -150,6 +173,7 @@ ai-atlas/
 │   │   └── src/
 │   │       ├── certainty.rs   Sesi 3 — Certainty Factor
 │   │       ├── bayes.rs       Sesi 4 — Bayesian
+│   │       ├── fuzzy.rs       Sesi 5-6 — Logika Fuzzy
 │   │       ├── fx.rs          Pertukaran pecahan bit-eksak
 │   │       └── rng.rs         SplitMix64 deterministik
 │   └── ai-wasm/        Jembatan wasm-bindgen. Amplop JSON ok/err.

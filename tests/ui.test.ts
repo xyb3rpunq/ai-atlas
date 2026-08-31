@@ -83,3 +83,14 @@ describe("clamp", () => {
     expect(clamp(0, -3, -1)).toBe(-1);
   });
 });
+
+describe("sel angka pada tabel", () => {
+  it("menulis bilangan bulat tanpa ekor desimal", () => {
+    // Nomor urut yang muncul sebagai "1.0000" terbaca seperti cacat.
+    expect(fmt(1, 0)).toBe("1");
+  });
+
+  it("tetap memberi presisi pada pecahan", () => {
+    expect(fmt(0.6, 4)).toBe("0.6000");
+  });
+});

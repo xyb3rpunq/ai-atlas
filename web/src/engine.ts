@@ -158,3 +158,112 @@ export function naiveBayesPredict(
     wasm.naive_bayes_predict(JSON.stringify(samples), JSON.stringify(query), alpha),
   );
 }
+
+// ---------------------------------------------------------------------------
+// Sesi 5 & 6 — Logika Fuzzy
+// ---------------------------------------------------------------------------
+
+/** Bentuk fungsi keanggotaan, sepadan dengan enum bertanda di sisi Rust. */
+export type Membership =
+  | { kind: "triangular"; a: number; b: number; c: number }
+  | { kind: "trapezoidal"; a: number; b: number; c: number; d: number }
+  | { kind: "gaussian"; mean: number; sigma: number }
+  | { kind: "sigmoid"; a: number; c: number }
+  | { kind: "scurve"; a: number; b: number }
+  | { kind: "zcurve"; a: number; b: number };
+
+/** Satu himpunan kabur bernama. */
+export interface NamedSet {
+  name: string;
+  membership: Membership;
+}
+
+/** Variabel linguistik beserta semesta dan himpunan-himpunannya. */
+export interface FuzzyVariable {
+  name: string;
+  min: number;
+  max: number;
+  sets: NamedSet[];
+}
+
+/** Satu premis aturan. */
+export interface Antecedent {
+  variable: string;
+  set: string;
+}
+
+/** Satu aturan JIKA-MAKA. */
+export interface FuzzyRule {
+  antecedents: Antecedent[];
+  connective: "AND" | "OR";
+  consequent_set: string;
+  consequent_value: number;
+  weight: number;
+}
+
+/** Sistem inferensi kabur lengkap. */
+export interface FuzzySystem {
+  inputs: FuzzyVariable[];
+  output: FuzzyVariable;
+  rules: FuzzyRule[];
+}
+
+/** Jejak satu aturan setelah dievaluasi. */
+export interface RuleTrace {
+  index: number;
+  degrees: number[];
+  firing_strength: number;
+  text: string;
+}
+
+/** Hasil inferensi kabur. */
+export interface Inference {
+  crisp: number;
+  rules: RuleTrace[];
+  xs: number[];
+  ys: number[];
+}
+
+/** Metode defuzzifikasi yang dikenali mesin. */
+export type DefuzzMethod =
+  | "centroid"
+  | "bisector"
+  | "mean_of_maximum"
+  | "smallest_of_maximum"
+  | "largest_of_maximum";
+
+/** Derajat keanggotaan sebuah nilai pada satu fungsi keanggotaan. */
+export function fuzzyDegree(set: Membership, x: number): number {
+  return unwrap<number>(wasm.fuzzy_degree(JSON.stringify(set), x));
+}
+
+/** Kurva sebuah fungsi keanggotaan, tercuplik seragam pada semesta. */
+export function fuzzyCurve(
+  set: Membership,
+  min: number,
+  max: number,
+  samples: number,
+): { xs: number[]; ys: number[] } {
+  return unwrap<{ xs: number[]; ys: number[] }>(
+    wasm.fuzzy_curve(JSON.stringify(set), min, max, samples),
+  );
+}
+
+/** Inferensi kabur lengkap dengan salah satu dari tiga mesin. */
+export function fuzzyInfer(
+  system: FuzzySystem,
+  inputs: [string, number][],
+  engineName: "mamdani" | "sugeno" | "tsukamoto",
+  method: DefuzzMethod,
+  samples = 201,
+): Inference {
+  return unwrap<Inference>(
+    wasm.fuzzy_infer(
+      JSON.stringify(system),
+      JSON.stringify(inputs),
+      engineName,
+      method,
+      samples,
+    ),
+  );
+}

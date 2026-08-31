@@ -174,6 +174,16 @@ export function stepList(steps: { label: string; formula: string }[]): HTMLEleme
   });
 }
 
+/**
+ * Memformat sel angka pada tabel.
+ *
+ * Bilangan bulat ditulis apa adanya — nomor urut yang muncul sebagai `1.0000`
+ * terbaca seperti cacat, bukan seperti data.
+ */
+function cellNumber(v: number): string {
+  return Number.isInteger(v) ? String(v) : fmt(v);
+}
+
 /** Tabel sederhana dari kepala kolom dan baris. */
 export function table(head: string[], rows: (string | number)[][]): HTMLElement {
   return el("div", {
@@ -194,7 +204,7 @@ export function table(head: string[], rows: (string | number)[][]): HTMLElement 
                 children: row.map((cell) =>
                   el("td", {
                     class: typeof cell === "number" ? "num" : "",
-                    text: typeof cell === "number" ? fmt(cell) : cell,
+                    text: typeof cell === "number" ? cellNumber(cell) : cell,
                   }),
                 ),
               }),

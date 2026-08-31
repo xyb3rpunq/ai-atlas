@@ -6,7 +6,7 @@
   "description": "AI ATLAS - 14 interactive laboratories covering the classical artificial intelligence syllabus. Every algorithm implemented from scratch in TypeScript, zero runtime dependencies.",
   "scripts": {
     "dev": "vite",
-    "build": "npm run wasm && tsc --noEmit && vite build",
+    "build": "npm run wasm && tsc --noEmit && vite build && node scripts/csp.mjs",
     "preview": "vite preview",
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",

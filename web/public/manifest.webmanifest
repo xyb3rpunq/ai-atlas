@@ -1,0 +1,29 @@
+{
+  "name": "AI ATLAS — Laboratorium Kecerdasan Buatan Klasik",
+  "short_name": "AI ATLAS",
+  "description": "Empat belas laboratorium interaktif algoritma kecerdasan buatan klasik, ditulis dengan Rust dan dijalankan lewat WebAssembly.",
+  "id": "/ai-atlas/",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0e14",
+  "theme_color": "#0a0e14",
+  "lang": "id",
+  "dir": "ltr",
+  "categories": ["education", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
