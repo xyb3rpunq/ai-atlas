@@ -1,0 +1,15 @@
+# Menyamakan rantai alat Rust antara mesin pengembang dan CI.
+#
+# Tanpa berkas ini, clippy di CI bisa lebih baru daripada yang terpasang lokal,
+# sehingga aturan lint baru muncul sebagai kegagalan mendadak setelah push —
+# bukan saat kode ditulis. Yang tercatat di sini adalah kanal, bukan nomor
+# versi, supaya perbaikan keamanan tetap masuk; jalankan `rustup update`
+# sebelum mulai bekerja.
+#
+# .Deckyx
+
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]
+targets = ["wasm32-unknown-unknown"]
+profile = "minimal"

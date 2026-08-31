@@ -16,6 +16,16 @@
 
 ## Sebelum mengirim perubahan
 
+Perbarui rantai alat lebih dulu. `rust-toolchain.toml` mengunci kanal, bukan
+nomor versi, jadi clippy lokal yang tertinggal akan meloloskan kode yang
+ditolak CI:
+
+```bash
+rustup update stable
+```
+
+Lalu:
+
 ```bash
 cargo fmt --all
 cargo clippy --workspace --all-targets -- -D warnings

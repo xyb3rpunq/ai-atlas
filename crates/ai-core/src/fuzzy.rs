@@ -332,7 +332,9 @@ pub fn alpha_cut(
 
 /// Membuat titik cuplikan seragam pada semesta `[min, max]`.
 pub fn sample_universe(min: f64, max: f64, samples: usize) -> Result<Vec<f64>, FuzzyError> {
-    if !(min < max) || !min.is_finite() || !max.is_finite() {
+    // Keberhinggaan diperiksa lebih dulu supaya NaN tersaring di sini; setelah
+    // itu `>=` sudah cukup dan niatnya terbaca langsung.
+    if !min.is_finite() || !max.is_finite() || min >= max {
         return Err(FuzzyError::BadUniverse { min, max });
     }
     if samples < 2 {
@@ -473,7 +475,7 @@ impl Variable {
 
     /// Memeriksa kesahihan semesta dan seluruh himpunannya.
     pub fn validate(&self) -> Result<(), FuzzyError> {
-        if !(self.min < self.max) {
+        if !self.min.is_finite() || !self.max.is_finite() || self.min >= self.max {
             return Err(FuzzyError::BadUniverse {
                 min: self.min,
                 max: self.max,
@@ -1391,6 +1393,42 @@ mod tests {
         let mut s = sistem_tip();
         s.output.min = 25.0;
         s.output.max = 0.0;
+        assert!(matches!(s.validate(), Err(FuzzyError::BadUniverse { .. })));
+    }
+
+    #[test]
+    fn validasi_menolak_semesta_bukan_angka() {
+        // NaN harus ditolak, bukan lolos diam-diam. Perbandingan `min >= max`
+        // saja akan meloloskannya, karena setiap perbandingan dengan NaN
+        // bernilai salah.
+        for (min, max) in [
+            (f64::NAN, 10.0),
+            (0.0, f64::NAN),
+            (f64::NEG_INFINITY, 10.0),
+            (0.0, f64::INFINITY),
+        ] {
+            let mut s = sistem_tip();
+            s.output.min = min;
+            s.output.max = max;
+            assert!(
+                matches!(s.validate(), Err(FuzzyError::BadUniverse { .. })),
+                "semesta ({min}, {max}) seharusnya ditolak"
+            );
+            assert!(
+                matches!(
+                    sample_universe(min, max, 11),
+                    Err(FuzzyError::BadUniverse { .. })
+                ),
+                "cuplikan ({min}, {max}) seharusnya ditolak"
+            );
+        }
+    }
+
+    #[test]
+    fn validasi_menolak_semesta_sama_panjang_nol() {
+        let mut s = sistem_tip();
+        s.output.min = 5.0;
+        s.output.max = 5.0;
         assert!(matches!(s.validate(), Err(FuzzyError::BadUniverse { .. })));
     }
 
