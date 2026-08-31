@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+members = ["crates/ai-core", "crates/ai-wasm"]
+
+[workspace.package]
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT"
+authors = ["Daniel Hutajulu (.Deckyx) <@xyb3rpunq>"]
+repository = "https://github.com/xyb3rpunq/ai-atlas"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

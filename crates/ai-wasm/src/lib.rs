@@ -1,0 +1,263 @@
+//! Jembatan WebAssembly untuk [`ai_core`].
+//!
+//! Semua data melintasi batas Rust/JavaScript sebagai string JSON. Pilihan ini
+//! disengaja: satu format, satu jalur kesalahan, dan payload di aplikasi ini
+//! kecil sehingga biaya serialisasinya tidak terasa. Setiap fungsi
+//! mengembalikan JSON dengan bentuk `{"ok": <hasil>}` atau `{"err": "<pesan>"}`
+//! agar sisi JavaScript tidak perlu menebak.
+
+#![forbid(unsafe_code)]
+#![warn(missing_docs)]
+
+use serde::Serialize;
+use wasm_bindgen::prelude::*;
+
+/// Membungkus hasil yang berhasil menjadi `{"ok": ...}`.
+fn ok<T: Serialize>(value: T) -> String {
+    #[derive(Serialize)]
+    struct Ok<T> {
+        ok: T,
+    }
+    serde_json::to_string(&Ok { ok: value })
+        .unwrap_or_else(|e| format!(r#"{{"err":"gagal serialisasi: {e}"}}"#))
+}
+
+/// Membungkus kegagalan menjadi `{"err": "..."}`.
+fn err<E: core::fmt::Display>(e: E) -> String {
+    let msg = e.to_string().replace('"', "'");
+    format!(r#"{{"err":"{msg}"}}"#)
+}
+
+/// Versi pustaka inti.
+#[wasm_bindgen]
+pub fn version() -> String {
+    ai_core::VERSION.to_string()
+}
+
+/// Daftar sesi kuliah yang sudah terimplementasi, sebagai JSON.
+#[wasm_bindgen]
+pub fn sessions() -> String {
+    #[derive(Serialize)]
+    struct S {
+        session: u8,
+        module: &'static str,
+        title_id: &'static str,
+        title_en: &'static str,
+    }
+    let list: Vec<S> = ai_core::SESSIONS
+        .iter()
+        .map(|s| S {
+            session: s.session,
+            module: s.module,
+            title_id: s.title_id,
+            title_en: s.title_en,
+        })
+        .collect();
+    ok(list)
+}
+
+// ---------------------------------------------------------------------------
+// Sesi 3 — Certainty Factor
+// ---------------------------------------------------------------------------
+
+/// `CF = MB - MD`.
+#[wasm_bindgen]
+pub fn cf_from_mb_md(mb: f64, md: f64) -> String {
+    match ai_core::certainty::cf_from_mb_md(mb, md) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+/// Menggabungkan daftar CF secara paralel sambil merekam tiap langkah.
+///
+/// `cfs_json` adalah larik JSON berisi bilangan, mis. `"[0.5,0.3,0.2]"`.
+#[wasm_bindgen]
+pub fn cf_combine(cfs_json: &str) -> String {
+    let cfs: Vec<f64> = match serde_json::from_str(cfs_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    match ai_core::certainty::combine_many_traced(&cfs) {
+        Ok((value, steps)) => {
+            #[derive(Serialize)]
+            struct Out {
+                value: f64,
+                steps: Vec<ai_core::certainty::CfStep>,
+                label_id: &'static str,
+                label_en: &'static str,
+            }
+            let c = ai_core::certainty::interpret(value);
+            ok(Out {
+                value,
+                steps,
+                label_id: c.label_id(),
+                label_en: c.label_en(),
+            })
+        }
+        Err(e) => err(e),
+    }
+}
+
+/// CF gabungan premis `AND` (minimum) atau `OR` (maksimum).
+#[wasm_bindgen]
+pub fn cf_premise(cfs_json: &str, operator: &str) -> String {
+    let cfs: Vec<f64> = match serde_json::from_str(cfs_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let result = match operator.to_ascii_uppercase().as_str() {
+        "AND" => ai_core::certainty::combine_and(&cfs),
+        "OR" => ai_core::certainty::combine_or(&cfs),
+        other => return err(format!("operator tidak dikenal: {other}")),
+    };
+    match result {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+/// CF berantai: CF aturan dikali CF bukti.
+#[wasm_bindgen]
+pub fn cf_sequential(cf_rule: f64, cf_evidence: f64) -> String {
+    match ai_core::certainty::combine_sequential(cf_rule, cf_evidence) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sesi 4 — Bayesian
+// ---------------------------------------------------------------------------
+
+/// Kasus Bayes dua hipotesis lengkap dengan jejak langkahnya.
+#[wasm_bindgen]
+pub fn bayes_binary(prior: f64, likelihood_h: f64, likelihood_not_h: f64) -> String {
+    match ai_core::bayes::binary_traced(prior, likelihood_h, likelihood_not_h) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+/// Posterior seluruh hipotesis dari larik prior dan likelihood.
+#[wasm_bindgen]
+pub fn bayes_posterior_all(priors_json: &str, likelihoods_json: &str) -> String {
+    let priors: Vec<f64> = match serde_json::from_str(priors_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let likelihoods: Vec<f64> = match serde_json::from_str(likelihoods_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    match ai_core::bayes::posterior_all(&priors, &likelihoods) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+/// Melatih Naive Bayes kategorikal lalu langsung memprediksi satu baris.
+///
+/// `samples_json` berbentuk `[{"features":["Cerah","Panas"],"label":"Tidak"}]`,
+/// `query_json` berbentuk `["Cerah","Panas"]`.
+#[wasm_bindgen]
+pub fn naive_bayes_predict(samples_json: &str, query_json: &str, alpha: f64) -> String {
+    let samples: Vec<ai_core::bayes::CategoricalSample> = match serde_json::from_str(samples_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let query: Vec<String> = match serde_json::from_str(query_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let mut model = ai_core::bayes::CategoricalNaiveBayes::new(alpha);
+    if let Err(e) = model.fit(&samples) {
+        return err(e);
+    }
+    match model.predict(&query) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pembungkus_ok_dan_err() {
+        assert_eq!(ok(1.5), r#"{"ok":1.5}"#);
+        assert!(err("gagal").contains("gagal"));
+        // Tanda kutip ganda pada pesan galat tidak boleh merusak JSON.
+        assert!(!err(r#"pesan "aneh""#).contains(r#""aneh""#));
+    }
+
+    #[test]
+    fn versi_dan_sesi() {
+        assert!(!version().is_empty());
+        let s = sessions();
+        assert!(s.starts_with(r#"{"ok":["#));
+        assert!(s.contains("certainty"));
+    }
+
+    #[test]
+    fn cf_dasar_lewat_jembatan() {
+        assert!(cf_from_mb_md(0.8, 0.01).contains("0.79"));
+        assert!(cf_from_mb_md(2.0, 0.0).contains("err"));
+    }
+
+    #[test]
+    fn cf_gabungan_lewat_jembatan() {
+        let out = cf_combine("[0.5,0.3,0.2]");
+        assert!(out.contains(r#""value":0.72"#), "{out}");
+        assert!(out.contains("steps"));
+        assert!(out.contains("label_id"));
+        assert!(cf_combine("bukan json").contains("err"));
+        assert!(cf_combine("[]").contains("err"));
+    }
+
+    #[test]
+    fn cf_premis_lewat_jembatan() {
+        assert!(cf_premise("[0.8,0.4]", "AND").contains("0.4"));
+        assert!(cf_premise("[0.8,0.4]", "or").contains("0.8"));
+        assert!(cf_premise("[0.8,0.4]", "XOR").contains("err"));
+        assert!(cf_premise("{}", "AND").contains("err"));
+    }
+
+    #[test]
+    fn cf_berantai_lewat_jembatan() {
+        assert!(cf_sequential(0.8, 0.5).contains("0.4"));
+        assert!(cf_sequential(9.0, 0.5).contains("err"));
+    }
+
+    #[test]
+    fn bayes_lewat_jembatan() {
+        let out = bayes_binary(0.2, 0.9, 0.3);
+        assert!(out.contains(r#""evidence":0.42"#), "{out}");
+        assert!(bayes_binary(2.0, 0.9, 0.3).contains("err"));
+    }
+
+    #[test]
+    fn bayes_posterior_semua_lewat_jembatan() {
+        let out = bayes_posterior_all("[0.2,0.8]", "[0.9,0.3]");
+        assert!(out.starts_with(r#"{"ok":["#), "{out}");
+        assert!(bayes_posterior_all("x", "[0.9]").contains("err"));
+        assert!(bayes_posterior_all("[0.2]", "x").contains("err"));
+        assert!(bayes_posterior_all("[0.2,0.8]", "[0.9]").contains("err"));
+    }
+
+    #[test]
+    fn naive_bayes_lewat_jembatan() {
+        let samples = r#"[
+            {"features":["Cerah","Panas"],"label":"Tidak"},
+            {"features":["Mendung","Panas"],"label":"Ya"},
+            {"features":["Mendung","Dingin"],"label":"Ya"}
+        ]"#;
+        let out = naive_bayes_predict(samples, r#"["Mendung","Panas"]"#, 1.0);
+        assert!(out.contains(r#""label":"Ya""#), "{out}");
+        assert!(naive_bayes_predict("[]", r#"["a"]"#, 1.0).contains("err"));
+        assert!(naive_bayes_predict("bukan", r#"["a"]"#, 1.0).contains("err"));
+        assert!(naive_bayes_predict(samples, "bukan", 1.0).contains("err"));
+        assert!(naive_bayes_predict(samples, r#"["Mendung"]"#, 1.0).contains("err"));
+    }
+}

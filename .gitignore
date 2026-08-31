@@ -1,0 +1,25 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# Keluaran wasm-pack (dibangun ulang oleh CI)
+/web/pkg/
+
+# Node
+node_modules/
+.npm/
+
+# Build
+/dist/
+
+# Editor & sistem
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Log
+*.log
+npm-debug.log*

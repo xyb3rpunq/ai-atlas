@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="id" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>AI ATLAS — Laboratorium Kecerdasan Buatan Klasik</title>
+    <meta
+      name="description"
+      content="Empat belas laboratorium interaktif yang mengimplementasikan algoritma kecerdasan buatan klasik dari nol dengan Rust dan WebAssembly. Certainty factor, Bayesian, logika fuzzy, pencarian, jaringan syaraf tiruan, sistem pakar, dan machine learning."
+    />
+    <meta name="author" content="Daniel Hutajulu (.Deckyx)" />
+    <meta name="creator" content=".Deckyx" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0a0e14" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f7f9fb" media="(prefers-color-scheme: light)" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="AI ATLAS — Laboratorium Kecerdasan Buatan Klasik" />
+    <meta
+      property="og:description"
+      content="Algoritma AI klasik ditulis dari nol dengan Rust, dijalankan di browser lewat WebAssembly, diverifikasi silang terhadap Go dan PL/SQL."
+    />
+    <meta property="og:url" content="https://xyb3rpunq.github.io/ai-atlas/" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="canonical" href="https://xyb3rpunq.github.io/ai-atlas/" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0e14'/%3E%3Ccircle cx='16' cy='9' r='3' fill='%234dd4c8'/%3E%3Ccircle cx='8' cy='22' r='3' fill='%234dd4c8'/%3E%3Ccircle cx='24' cy='22' r='3' fill='%234dd4c8'/%3E%3Cpath d='M16 12 8 19M16 12l8 7M8 22h16' stroke='%234dd4c8' stroke-width='1.6' fill='none' opacity='.65'/%3E%3C/svg%3E" />
+
+    <script>
+      // Tema dipulihkan sebelum gaya dilukis agar tidak ada kedipan warna.
+      try {
+        const t = localStorage.getItem("ai-atlas:theme");
+        if (t === "light" || t === "dark") {
+          document.documentElement.dataset.theme = t;
+        } else {
+          document.documentElement.dataset.theme = window.matchMedia(
+            "(prefers-color-scheme: light)",
+          ).matches
+            ? "light"
+            : "dark";
+        }
+        const l = localStorage.getItem("ai-atlas:lang");
+        if (l === "id" || l === "en") document.documentElement.lang = l;
+      } catch {
+        /* Penyimpanan bisa diblokir; tema bawaan tetap terpakai. */
+      }
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#lab">Lompat ke laboratorium</a>
+    <div id="app" aria-busy="true">
+      <noscript>
+        <p style="padding: 2rem">
+          AI ATLAS menjalankan algoritma langsung di peramban Anda, jadi
+          JavaScript harus diaktifkan. Kode sumber lengkapnya tetap bisa dibaca di
+          <a href="https://github.com/xyb3rpunq/ai-atlas">GitHub</a>.
+        </p>
+      </noscript>
+    </div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

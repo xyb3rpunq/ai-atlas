@@ -1,0 +1,34 @@
+[package]
+name = "ai-wasm"
+description = "WebAssembly bindings for ai-core."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+ai-core = { path = "../ai-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+wasm-bindgen = "0.2"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+# wasm-opt yang dibundel wasm-pack lebih tua daripada keluaran rustc 1.95,
+# yang sudah memancarkan instruksi bulk-memory (memory.copy/memory.fill).
+# Fitur-fitur ini dinyalakan eksplisit agar tahap optimasi tidak menolak modul.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = [
+  "-Oz",
+  "--enable-bulk-memory",
+  "--enable-nontrapping-float-to-int",
+  "--enable-mutable-globals",
+  "--enable-sign-ext",
+  "--enable-reference-types",
+]
