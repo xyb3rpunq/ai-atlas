@@ -25,6 +25,7 @@
 //! | 8 | Teknik Pencarian | [`search`] |
 //! | 9 | Jaringan Syaraf Tiruan | [`neural`] |
 //! | 11 | Sistem Pakar | [`expert`] |
+//! | 12-13 | Sains Data & Machine Learning | [`ml`] |
 //! | — | Penunjang: keacakan deterministik | [`rng`] |
 //! | — | Penunjang: pertukaran pecahan bit-eksak | [`fx`] |
 
@@ -37,6 +38,7 @@ pub mod certainty;
 pub mod expert;
 pub mod fuzzy;
 pub mod fx;
+pub mod ml;
 pub mod neural;
 pub mod rng;
 pub mod search;
@@ -100,6 +102,18 @@ pub const SESSIONS: &[SessionInfo] = &[
         module: "expert",
         title_id: "Sistem Pakar",
         title_en: "Expert Systems",
+    },
+    SessionInfo {
+        session: 12,
+        module: "ml",
+        title_id: "Sains Data dan Big Data",
+        title_en: "Data Science and Big Data",
+    },
+    SessionInfo {
+        session: 13,
+        module: "ml",
+        title_id: "Machine Learning",
+        title_en: "Machine Learning",
     },
 ];
 

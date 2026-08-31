@@ -739,6 +739,301 @@ pub fn expert_how(kb_json: &str, facts_json: &str, fact: &str) -> String {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Sesi 12 & 13 — Sains Data dan Machine Learning
+// ---------------------------------------------------------------------------
+
+/// Membaca nama ukuran jarak.
+fn parse_distance(name: &str) -> Result<ai_core::ml::Distance, String> {
+    use ai_core::ml::Distance;
+    Ok(match name.to_ascii_lowercase().as_str() {
+        "euclidean" => Distance::Euclidean,
+        "manhattan" => Distance::Manhattan,
+        "chebyshev" => Distance::Chebyshev,
+        other => return Err(format!("ukuran jarak tidak dikenal: {other}")),
+    })
+}
+
+/// Klasifikasi satu titik dengan K-Nearest Neighbours.
+#[wasm_bindgen]
+pub fn ml_knn_predict(
+    x_json: &str,
+    y_json: &str,
+    query_json: &str,
+    k: usize,
+    distance: &str,
+    weighted: bool,
+) -> String {
+    let x: Vec<Vec<f64>> = match serde_json::from_str(x_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let y: Vec<String> = match serde_json::from_str(y_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let query: Vec<f64> = match serde_json::from_str(query_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let d = match parse_distance(distance) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let model = match ai_core::ml::Knn::new(x, y, k, d, weighted) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    match model.predict(&query) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+/// Wilayah keputusan KNN pada kisi seragam, untuk digambar sebagai latar.
+#[wasm_bindgen]
+pub fn ml_knn_regions(
+    x_json: &str,
+    y_json: &str,
+    k: usize,
+    distance: &str,
+    weighted: bool,
+    min: f64,
+    max: f64,
+    resolution: usize,
+) -> String {
+    let x: Vec<Vec<f64>> = match serde_json::from_str(x_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let y: Vec<String> = match serde_json::from_str(y_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let d = match parse_distance(distance) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    if !(2..=200).contains(&resolution) {
+        return err(format!(
+            "resolusi harus antara 2 dan 200, diberi {resolution}"
+        ));
+    }
+    if !min.is_finite() || !max.is_finite() || min >= max {
+        return err(format!("rentang tidak sah: {min} sampai {max}"));
+    }
+
+    // Daftar kelas dikumpulkan lebih dulu supaya keluarannya berupa indeks
+    // ringkas, bukan ribuan salinan nama kelas yang sama.
+    let mut classes: Vec<String> = y.clone();
+    classes.sort();
+    classes.dedup();
+
+    let model = match ai_core::ml::Knn::new(x, y, k, d, weighted) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+
+    let step = (max - min) / (resolution - 1) as f64;
+    let mut cells = Vec::with_capacity(resolution * resolution);
+    for j in 0..resolution {
+        for i in 0..resolution {
+            let point = [min + step * i as f64, min + step * j as f64];
+            match model.predict(&point) {
+                Ok(r) => {
+                    let index = classes.iter().position(|c| *c == r.label).unwrap_or(0);
+                    cells.push(index as u32);
+                }
+                Err(e) => return err(e),
+            }
+        }
+    }
+    #[derive(Serialize)]
+    struct Out {
+        classes: Vec<String>,
+        resolution: usize,
+        cells: Vec<u32>,
+    }
+    ok(Out {
+        classes,
+        resolution,
+        cells,
+    })
+}
+
+/// Pengelompokan K-Means.
+#[wasm_bindgen]
+pub fn ml_kmeans(
+    x_json: &str,
+    k: usize,
+    distance: &str,
+    max_iterations: usize,
+    seed: u64,
+) -> String {
+    let x: Vec<Vec<f64>> = match serde_json::from_str(x_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let d = match parse_distance(distance) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    match ai_core::ml::kmeans(&x, k, d, max_iterations, seed) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+/// Membangun pohon keputusan ID3 dari data kategorikal.
+#[wasm_bindgen]
+pub fn ml_build_tree(x_json: &str, y_json: &str, names_json: &str, max_depth: usize) -> String {
+    let x: Vec<Vec<String>> = match serde_json::from_str(x_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let y: Vec<String> = match serde_json::from_str(y_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let names: Vec<String> = match serde_json::from_str(names_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    match ai_core::ml::build_id3(&x, &y, &names, max_depth) {
+        Ok(tree) => {
+            #[derive(Serialize)]
+            struct Out {
+                tree: ai_core::ml::TreeNode,
+                depth: usize,
+                leaves: usize,
+                root_entropy: f64,
+                gains: Vec<(String, f64)>,
+            }
+            // Perolehan tiap atribut pada akar ditampilkan agar terlihat
+            // mengapa atribut tertentu yang dipilih lebih dulu.
+            let gains = names
+                .iter()
+                .enumerate()
+                .map(|(i, name)| {
+                    let values: Vec<String> = x
+                        .iter()
+                        .map(|r| r.get(i).cloned().unwrap_or_default())
+                        .collect();
+                    (name.clone(), ai_core::ml::information_gain(&values, &y))
+                })
+                .collect();
+            ok(Out {
+                depth: tree.depth(),
+                leaves: tree.leaf_count(),
+                root_entropy: ai_core::ml::entropy(&y),
+                gains,
+                tree,
+            })
+        }
+        Err(e) => err(e),
+    }
+}
+
+/// Memprediksi label sebuah baris dengan pohon yang sudah dibangun.
+#[wasm_bindgen]
+pub fn ml_tree_predict(tree_json: &str, row_json: &str) -> String {
+    let tree: ai_core::ml::TreeNode = match serde_json::from_str(tree_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let row: Vec<String> = match serde_json::from_str(row_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    ok(tree.predict(&row))
+}
+
+/// Regresi linear satu peubah.
+#[wasm_bindgen]
+pub fn ml_fit_linear(x_json: &str, y_json: &str) -> String {
+    let x: Vec<f64> = match serde_json::from_str(x_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let y: Vec<f64> = match serde_json::from_str(y_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    match ai_core::ml::fit_linear(&x, &y) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+/// Matriks konfusi beserta ukuran turunannya.
+#[wasm_bindgen]
+pub fn ml_evaluate(actual_json: &str, predicted_json: &str) -> String {
+    let actual: Vec<String> = match serde_json::from_str(actual_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let predicted: Vec<String> = match serde_json::from_str(predicted_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    match ai_core::ml::evaluate(&actual, &predicted) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+/// Kumpulan data tenis klasik, dipakai pada laboratorium pohon keputusan.
+#[wasm_bindgen]
+pub fn ml_tennis_dataset() -> String {
+    let rows: [([&str; 4], &str); 14] = [
+        (["Cerah", "Panas", "Tinggi", "Lemah"], "Tidak"),
+        (["Cerah", "Panas", "Tinggi", "Kuat"], "Tidak"),
+        (["Mendung", "Panas", "Tinggi", "Lemah"], "Ya"),
+        (["Hujan", "Sejuk", "Tinggi", "Lemah"], "Ya"),
+        (["Hujan", "Dingin", "Normal", "Lemah"], "Ya"),
+        (["Hujan", "Dingin", "Normal", "Kuat"], "Tidak"),
+        (["Mendung", "Dingin", "Normal", "Kuat"], "Ya"),
+        (["Cerah", "Sejuk", "Tinggi", "Lemah"], "Tidak"),
+        (["Cerah", "Dingin", "Normal", "Lemah"], "Ya"),
+        (["Hujan", "Sejuk", "Normal", "Lemah"], "Ya"),
+        (["Cerah", "Sejuk", "Normal", "Kuat"], "Ya"),
+        (["Mendung", "Sejuk", "Tinggi", "Kuat"], "Ya"),
+        (["Mendung", "Panas", "Normal", "Lemah"], "Ya"),
+        (["Hujan", "Sejuk", "Tinggi", "Kuat"], "Tidak"),
+    ];
+    #[derive(Serialize)]
+    struct Out {
+        names: Vec<String>,
+        values: Vec<Vec<String>>,
+        x: Vec<Vec<String>>,
+        y: Vec<String>,
+    }
+    let x: Vec<Vec<String>> = rows
+        .iter()
+        .map(|(f, _)| f.iter().map(|v| v.to_string()).collect())
+        .collect();
+    let y: Vec<String> = rows.iter().map(|(_, l)| l.to_string()).collect();
+    let names: Vec<String> = ["Cuaca", "Suhu", "Kelembapan", "Angin"]
+        .iter()
+        .map(|v| v.to_string())
+        .collect();
+    // Nilai unik tiap atribut, dipakai antarmuka untuk menyusun pilihan.
+    let values: Vec<Vec<String>> = (0..names.len())
+        .map(|i| {
+            let mut v: Vec<String> = x.iter().map(|r| r[i].clone()).collect();
+            v.sort();
+            v.dedup();
+            v
+        })
+        .collect();
+    ok(Out {
+        names,
+        values,
+        x,
+        y,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1154,5 +1449,130 @@ mod tests {
         assert!(how.contains("R1"), "{how}");
         assert!(expert_how("bukan", GEJALA_FLU, "flu").contains("err"));
         assert!(expert_how(&kb_uji(), "bukan", "flu").contains("err"));
+    }
+
+    const X_KNN: &str = r#"[[1,1],[1.2,0.9],[0.8,1.1],[8,8],[8.2,7.9],[7.8,8.1]]"#;
+    const Y_KNN: &str = r#"["A","A","A","B","B","B"]"#;
+
+    #[test]
+    fn knn_lewat_jembatan() {
+        let out = ml_knn_predict(X_KNN, Y_KNN, "[1,1]", 3, "euclidean", false);
+        assert!(out.contains(r#""label":"A""#), "{out}");
+        assert!(out.contains("neighbours"));
+        let jauh = ml_knn_predict(X_KNN, Y_KNN, "[8,8]", 3, "manhattan", true);
+        assert!(jauh.contains(r#""label":"B""#), "{jauh}");
+    }
+
+    #[test]
+    fn knn_menolak_masukan_salah() {
+        assert!(ml_knn_predict("bukan", Y_KNN, "[1,1]", 3, "euclidean", false).contains("err"));
+        assert!(ml_knn_predict(X_KNN, "bukan", "[1,1]", 3, "euclidean", false).contains("err"));
+        assert!(ml_knn_predict(X_KNN, Y_KNN, "bukan", 3, "euclidean", false).contains("err"));
+        assert!(ml_knn_predict(X_KNN, Y_KNN, "[1,1]", 3, "entah", false).contains("err"));
+        assert!(ml_knn_predict(X_KNN, Y_KNN, "[1,1]", 0, "euclidean", false).contains("err"));
+        // Titik dengan jumlah fitur berbeda harus ditolak.
+        assert!(ml_knn_predict(X_KNN, Y_KNN, "[1]", 3, "euclidean", false).contains("err"));
+    }
+
+    #[test]
+    fn wilayah_keputusan_knn() {
+        let out = ml_knn_regions(X_KNN, Y_KNN, 3, "euclidean", false, 0.0, 10.0, 20);
+        assert!(out.contains(r#""resolution":20"#), "{out}");
+        assert!(out.contains(r#""classes":["A","B"]"#), "{out}");
+        assert!(ml_knn_regions(X_KNN, Y_KNN, 3, "euclidean", false, 0.0, 10.0, 1).contains("err"));
+        assert!(ml_knn_regions(X_KNN, Y_KNN, 3, "euclidean", false, 10.0, 0.0, 20).contains("err"));
+        assert!(ml_knn_regions(X_KNN, Y_KNN, 3, "entah", false, 0.0, 10.0, 20).contains("err"));
+    }
+
+    #[test]
+    fn kmeans_lewat_jembatan() {
+        let out = ml_kmeans(X_KNN, 2, "euclidean", 100, 42);
+        assert!(out.contains("centroids"), "{out}");
+        assert!(out.contains(r#""converged":true"#), "{out}");
+        assert!(ml_kmeans("bukan", 2, "euclidean", 100, 1).contains("err"));
+        assert!(ml_kmeans(X_KNN, 99, "euclidean", 100, 1).contains("err"));
+        assert!(ml_kmeans(X_KNN, 2, "entah", 100, 1).contains("err"));
+    }
+
+    fn data_tenis_json() -> (String, String, String) {
+        let out = ml_tennis_dataset();
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        (
+            serde_json::to_string(&v["ok"]["x"]).unwrap(),
+            serde_json::to_string(&v["ok"]["y"]).unwrap(),
+            serde_json::to_string(&v["ok"]["names"]).unwrap(),
+        )
+    }
+
+    #[test]
+    fn kumpulan_data_tenis_lewat_jembatan() {
+        let out = ml_tennis_dataset();
+        assert!(out.contains("Cuaca"), "{out}");
+        assert!(out.contains("Mendung"));
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(v["ok"]["x"].as_array().unwrap().len(), 14);
+        assert_eq!(v["ok"]["values"].as_array().unwrap().len(), 4);
+    }
+
+    #[test]
+    fn pohon_keputusan_lewat_jembatan() {
+        let (x, y, names) = data_tenis_json();
+        let out = ml_build_tree(&x, &y, &names, 10);
+        assert!(!out.contains(r#""err""#), "{out}");
+        assert!(out.contains(r#""kind":"branch""#), "{out}");
+        assert!(out.contains("root_entropy"));
+        assert!(out.contains("gains"));
+
+        // Perolehan Cuaca harus yang tertinggi.
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        let gains = v["ok"]["gains"].as_array().unwrap();
+        let cuaca = gains.iter().find(|g| g[0] == "Cuaca").unwrap()[1]
+            .as_f64()
+            .unwrap();
+        for g in gains {
+            assert!(cuaca >= g[1].as_f64().unwrap() - 1e-12);
+        }
+    }
+
+    #[test]
+    fn pohon_keputusan_menolak_masukan_salah() {
+        let (x, y, names) = data_tenis_json();
+        assert!(ml_build_tree("bukan", &y, &names, 5).contains("err"));
+        assert!(ml_build_tree(&x, "bukan", &names, 5).contains("err"));
+        assert!(ml_build_tree(&x, &y, "bukan", 5).contains("err"));
+        assert!(ml_build_tree("[]", "[]", &names, 5).contains("err"));
+    }
+
+    #[test]
+    fn ramalan_pohon_lewat_jembatan() {
+        let (x, y, names) = data_tenis_json();
+        let built = ml_build_tree(&x, &y, &names, 10);
+        let v: serde_json::Value = serde_json::from_str(&built).unwrap();
+        let tree = serde_json::to_string(&v["ok"]["tree"]).unwrap();
+
+        let out = ml_tree_predict(&tree, r#"["Mendung","Panas","Tinggi","Lemah"]"#);
+        assert!(out.contains("Ya"), "{out}");
+        assert!(ml_tree_predict("bukan", "[]").contains("err"));
+        assert!(ml_tree_predict(&tree, "bukan").contains("err"));
+    }
+
+    #[test]
+    fn regresi_linear_lewat_jembatan() {
+        let out = ml_fit_linear("[1,2,3,4]", "[3,5,7,9]");
+        assert!(out.contains(r#""slope":2"#), "{out}");
+        assert!(out.contains("r_squared"));
+        assert!(ml_fit_linear("bukan", "[1]").contains("err"));
+        assert!(ml_fit_linear("[1]", "bukan").contains("err"));
+        assert!(ml_fit_linear("[1,2]", "[1]").contains("err"));
+    }
+
+    #[test]
+    fn evaluasi_lewat_jembatan() {
+        let out = ml_evaluate(r#"["A","A","B"]"#, r#"["A","B","B"]"#);
+        assert!(out.contains("accuracy"), "{out}");
+        assert!(out.contains("baseline_accuracy"), "{out}");
+        assert!(out.contains("macro_f1"));
+        assert!(ml_evaluate("bukan", "[]").contains("err"));
+        assert!(ml_evaluate(r#"["A"]"#, "[]").contains("err"));
     }
 }

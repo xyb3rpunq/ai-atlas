@@ -648,3 +648,190 @@ export function expertHow(
     wasm.expert_how(JSON.stringify(kb), JSON.stringify(facts), fact),
   );
 }
+
+// ---------------------------------------------------------------------------
+// Sesi 12 & 13 — Sains Data dan Machine Learning
+// ---------------------------------------------------------------------------
+
+/** Ukuran jarak antartitik. */
+export type Distance = "euclidean" | "manhattan" | "chebyshev";
+
+/** Satu tetangga beserta jaraknya. */
+export interface Neighbour {
+  index: number;
+  distance: number;
+  label: string;
+}
+
+/** Hasil klasifikasi KNN. */
+export interface KnnResult {
+  label: string;
+  neighbours: Neighbour[];
+  votes: Record<string, number>;
+}
+
+/** Wilayah keputusan KNN pada kisi seragam. */
+export interface KnnRegions {
+  classes: string[];
+  resolution: number;
+  /** Indeks kelas tiap sel, baris demi baris dari bawah ke atas. */
+  cells: number[];
+}
+
+/** Hasil pengelompokan K-Means. */
+export interface Clustering {
+  centroids: number[][];
+  assignments: number[];
+  inertia: number;
+  iterations: number;
+  converged: boolean;
+}
+
+/** Satu simpul pohon keputusan. */
+export type TreeNode =
+  | { kind: "leaf"; label: string; samples: number; purity: number }
+  | {
+      kind: "branch";
+      attribute: number;
+      attribute_name: string;
+      gain: number;
+      children: Record<string, TreeNode>;
+      fallback: string;
+    };
+
+/** Pohon keputusan beserta angka yang menjelaskan pembentukannya. */
+export interface TreeResult {
+  tree: TreeNode;
+  depth: number;
+  leaves: number;
+  root_entropy: number;
+  gains: [string, number][];
+}
+
+/** Model regresi linear satu peubah. */
+export interface LinearRegression {
+  intercept: number;
+  slope: number;
+  r_squared: number;
+}
+
+/** Matriks konfusi beserta ukuran turunannya. */
+export interface Evaluation {
+  labels: string[];
+  matrix: number[][];
+  accuracy: number;
+  precision: Record<string, number>;
+  recall: Record<string, number>;
+  f1: Record<string, number>;
+  macro_f1: number;
+  /** Ketepatan yang dicapai dengan selalu menebak kelas terbanyak. */
+  baseline_accuracy: number;
+}
+
+/** Kumpulan data tenis klasik untuk pohon keputusan. */
+export interface TennisDataset {
+  names: string[];
+  values: string[][];
+  x: string[][];
+  y: string[];
+}
+
+/** Klasifikasi satu titik dengan K-Nearest Neighbours. */
+export function mlKnnPredict(
+  x: number[][],
+  y: string[],
+  query: number[],
+  k: number,
+  distance: Distance,
+  weighted: boolean,
+): KnnResult {
+  return unwrap<KnnResult>(
+    wasm.ml_knn_predict(
+      JSON.stringify(x),
+      JSON.stringify(y),
+      JSON.stringify(query),
+      k,
+      distance,
+      weighted,
+    ),
+  );
+}
+
+/** Wilayah keputusan KNN pada kisi seragam. */
+export function mlKnnRegions(
+  x: number[][],
+  y: string[],
+  k: number,
+  distance: Distance,
+  weighted: boolean,
+  min: number,
+  max: number,
+  resolution: number,
+): KnnRegions {
+  return unwrap<KnnRegions>(
+    wasm.ml_knn_regions(
+      JSON.stringify(x),
+      JSON.stringify(y),
+      k,
+      distance,
+      weighted,
+      min,
+      max,
+      resolution,
+    ),
+  );
+}
+
+/** Pengelompokan K-Means. */
+export function mlKmeans(
+  x: number[][],
+  k: number,
+  distance: Distance,
+  maxIterations: number,
+  seed: number,
+): Clustering {
+  return unwrap<Clustering>(
+    wasm.ml_kmeans(JSON.stringify(x), k, distance, maxIterations, BigInt(seed)),
+  );
+}
+
+/** Membangun pohon keputusan ID3 dari data kategorikal. */
+export function mlBuildTree(
+  x: string[][],
+  y: string[],
+  names: string[],
+  maxDepth: number,
+): TreeResult {
+  return unwrap<TreeResult>(
+    wasm.ml_build_tree(
+      JSON.stringify(x),
+      JSON.stringify(y),
+      JSON.stringify(names),
+      maxDepth,
+    ),
+  );
+}
+
+/** Memprediksi label sebuah baris dengan pohon yang sudah dibangun. */
+export function mlTreePredict(tree: TreeNode, row: string[]): string {
+  return unwrap<string>(wasm.ml_tree_predict(JSON.stringify(tree), JSON.stringify(row)));
+}
+
+/** Regresi linear satu peubah. */
+export function mlFitLinear(x: number[], y: number[]): LinearRegression {
+  return unwrap<LinearRegression>(
+    wasm.ml_fit_linear(JSON.stringify(x), JSON.stringify(y)),
+  );
+}
+
+/** Matriks konfusi beserta ukuran turunannya. */
+export function mlEvaluate(actual: string[], predicted: string[]): Evaluation {
+  return unwrap<Evaluation>(
+    wasm.ml_evaluate(JSON.stringify(actual), JSON.stringify(predicted)),
+  );
+}
+
+/** Kumpulan data tenis klasik. */
+export function mlTennisDataset(): TennisDataset {
+  return unwrap<TennisDataset>(wasm.ml_tennis_dataset());
+}
