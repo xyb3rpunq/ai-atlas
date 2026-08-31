@@ -4,7 +4,11 @@
 #   1. Rust     — format, clippy tanpa peringatan, seluruh uji, dokumentasi.
 #   2. Keamanan — audit kerentanan crate dan paket npm.
 #   3. Web      — periksa tipe, uji, build, kebijakan keamanan konten, anggaran ukuran.
-#   4. Terbit   — hanya bila ketiganya lolos, dan hanya dari `main`.
+#   4. Konformansi — implementasi Rust diadu terhadap implementasi Go yang
+#      ditulis terpisah, memakai 2.266 vektor uji berpola bit. Rumus yang salah
+#      tetap konsisten dengan dirinya sendiri, sehingga uji terhadap satu
+#      implementasi tidak bisa menangkapnya.
+#   5. Terbit   — hanya bila keempatnya lolos, dan hanya dari `main`.
 #
 # .Deckyx
 
@@ -150,9 +154,73 @@ jobs:
         with:
           path: dist
 
+  conform:
+    name: Konformansi — Rust lawan Go
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Pasang toolchain Rust
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-conform-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: cargo-conform-${{ runner.os }}-
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          # Modul ini tidak punya dependensi, jadi tidak ada go.sum. Berkas
+          # go.mod dipakai sebagai kunci singgahan supaya langkahnya tidak gagal
+          # mencari berkas yang memang tidak seharusnya ada.
+          cache-dependency-path: tools/conform/go.mod
+
+      - name: Hasilkan vektor uji dari implementasi Rust
+        run: cargo run -p ai-core --bin export_vectors
+
+      # Vektor yang dihasilkan harus sama persis dengan yang tersimpan di
+      # repositori. Kalau berbeda, berarti perilaku numerik Rust berubah tanpa
+      # ada yang menyadarinya — dan perubahan seperti itu wajib disengaja.
+      - name: Pastikan vektor tersimpan masih mutakhir
+        run: |
+          if ! git diff --quiet -- tools/conform/vectors; then
+            echo "Vektor uji tersimpan sudah tidak sepadan dengan keluaran Rust."
+            echo "Perilaku numerik berubah. Periksa selisih di bawah, lalu"
+            echo "jalankan 'cargo run -p ai-core --bin export_vectors' dan komit hasilnya."
+            git --no-pager diff --stat -- tools/conform/vectors
+            exit 1
+          fi
+
+      - name: Format Go
+        working-directory: tools/conform
+        run: |
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "Berkas berikut belum diformat:"
+            gofmt -l .
+            exit 1
+          fi
+
+      - name: Vet Go
+        working-directory: tools/conform
+        run: go vet ./...
+
+      - name: Uji harness
+        working-directory: tools/conform
+        run: go test ./... -v
+
+      - name: Adu Rust lawan Go
+        working-directory: tools/conform
+        run: go run .
+
   deploy:
     name: Terbitkan ke GitHub Pages
-    needs: [rust, security, web]
+    needs: [rust, security, web, conform]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:

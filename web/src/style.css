@@ -646,3 +646,134 @@ canvas {
   gap: 0.5rem 1.25rem;
   justify-content: space-between;
 }
+
+/* ------------------------------------------------------- catatan & definisi */
+
+.notes {
+  margin-top: 1.6rem;
+}
+
+.note--lead {
+  border-left-color: var(--accent-dim);
+  font-size: 0.9rem;
+  margin-top: 0;
+  margin-bottom: 1.4rem;
+}
+
+.notes__heading {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 650;
+  margin: 1.6rem 0 0.7rem;
+}
+
+.notes__heading:first-of-type {
+  margin-top: 0;
+}
+
+.defs {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(9rem, 14rem) minmax(0, 1fr);
+  gap: 0.5rem 1.1rem;
+  align-items: baseline;
+}
+
+@media (width < 720px) {
+  .defs {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.15rem;
+  }
+
+  .defs dd {
+    margin-bottom: 0.85rem;
+  }
+}
+
+.defs dt {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--text);
+  font-weight: 550;
+}
+
+.defs dd {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.formulas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 0.9rem;
+}
+
+.formula {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 0.8rem 0.9rem;
+}
+
+.formula__name {
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-weight: 600;
+  margin-bottom: 0.45rem;
+}
+
+.formula__body {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--accent);
+  margin: 0 0 0.5rem;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  line-height: 1.65;
+}
+
+.formula__note {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.55;
+}
+
+.pitfalls,
+.refs {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.pitfalls li {
+  font-size: 0.86rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.pitfalls li::marker {
+  color: var(--warn);
+}
+
+.refs li {
+  font-size: 0.8rem;
+  color: var(--text-faint);
+  line-height: 1.55;
+}
+
+.refs a {
+  color: var(--text-muted);
+}
+
+.refs a:hover {
+  color: var(--accent);
+}

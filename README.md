@@ -40,12 +40,12 @@ Rumus yang salah tidak akan membuat program *crash*. Ia hanya mengeluarkan angka
               │                        │                        │
    ┌──────────▼─────────┐  ┌───────────▼──────────┐  ┌──────────▼──────────┐
    │  crates/ai-wasm    │  │  tools/conform (Go)  │  │  oracle/ (PL/SQL)   │
-   │  wasm-bindgen      │  │  implementasi ke-2   │  │  implementasi ke-3  │
+   │  wasm-bindgen      │  │  implementasi ke-2 ✅│  │  implementasi ke-3  │
    │  → peramban        │  │  + harness pembanding│  │  + basis pengetahuan│
    └──────────┬─────────┘  └───────────┬──────────┘  └──────────┬──────────┘
               │                        │                        │
               │                        └───── bandingkan ───────┘
-              │                          bit-eksak, ribuan kasus
+              │                          2.266 vektor pola bit
               │                          selisih 1 ULP = build gagal
    ┌──────────▼─────────┐
    │  web/  TypeScript  │
@@ -54,6 +54,24 @@ Rumus yang salah tidak akan membuat program *crash*. Ia hanya mengeluarkan angka
 ```
 
 Tiga implementasi independen dari matematika yang sama. CI menjalankan ribuan kasus uji lewat ketiganya dan membandingkan **pola bit IEEE-754**, bukan desimal. Selisih satu ULP pun menggagalkan build.
+
+### Status konformansi
+
+| Berkas vektor | Baris | Tingkat | Rust ⟷ Go |
+|---|---:|---|:---:|
+| `bayes.tsv` | 729 | BitExact | ✅ |
+| `certainty.tsv` | 680 | BitExact | ✅ |
+| `fuzzy_linear.tsv` | 520 | BitExact | ✅ |
+| `fuzzy_transcendental.tsv` | 222 | NearlyEqual(4) | ✅ |
+| `rng.tsv` | 72 | BitExact | ✅ |
+| `ml_exact.tsv` | 18 | BitExact | ✅ |
+| `fx.tsv` | 14 | BitExact | ✅ |
+| `ml_entropy.tsv` | 11 | NearlyEqual(4) | ✅ |
+| **Total** | **2.266** | | **cocok** |
+
+Harness-nya sendiri punya uji: sebuah vektor yang sengaja dirusak sebesar satu ULP harus tertangkap, dilaporkan di baris yang benar, dengan kedua pola bitnya. Harness yang selalu lolos tidak berguna.
+
+CI juga memeriksa bahwa vektor yang tersimpan masih sepadan dengan keluaran Rust. Kalau berbeda, berarti perilaku numerik berubah tanpa ada yang menyadarinya — dan perubahan seperti itu wajib disengaja.
 
 ### Catatan teknis: kenapa pola bit, bukan desimal
 
@@ -134,6 +152,9 @@ npm run dev       # buka http://localhost:5173
 | `npm run wasm` | Kompilasi ulang mesin Rust ke WebAssembly |
 | `npm run build` | Build produksi ke `dist/` |
 | `npm run test` | Uji sisi TypeScript |
+| `cargo run -p ai-core --bin export_vectors` | Menghasilkan ulang vektor uji lintas bahasa |
+| `cd tools/conform && go test ./...` | Uji harness konformansi |
+| `cd tools/conform && go run .` | Mengadu implementasi Rust terhadap Go |
 | `npm run audit:all` | Periksa tipe + seluruh uji |
 | `cargo test --workspace` | Seluruh uji Rust |
 | `cargo clippy --workspace --all-targets -- -D warnings` | Pemeriksaan gaya, peringatan dianggap galat |
@@ -161,7 +182,9 @@ Setiap fungsi publik punya uji. Bukan uji jalur bahagia saja — uji nilai batas
 | `lib.rs` | 2 | 4 |
 | `ai-wasm/lib.rs` | 55 | 70 |
 | `web/src/ui.ts` | 11 | 15 |
-| **Total** | **343** | **577** |
+| `web/src/labs/notes.ts` | 1 | 54 |
+| `tools/conform` (Go) | 22 | 10 |
+| **Total** | **366** | **641** |
 
 Beberapa uji yang menahan seluruh proyek ini tetap jujur:
 
@@ -222,10 +245,15 @@ ai-atlas/
 │   │       ├── fx.rs          Pertukaran pecahan bit-eksak
 │   │       └── rng.rs         SplitMix64 deterministik
 │   └── ai-wasm/        Jembatan wasm-bindgen. Amplop JSON ok/err.
+├── tools/
+│   └── conform/        Implementasi pembanding Go + harness konformansi
+│       ├── aicore/     Algoritma ditulis ulang dari nol dalam Go
+│       └── vectors/    2.266 vektor uji berpola bit, dihasilkan Rust
 ├── web/
 │   ├── src/
 │   │   ├── engine.ts   Pembungkus bertipe untuk WebAssembly
 │   │   ├── labs/       Satu berkas per laboratorium
+│   │   │   └── notes.ts  81 definisi, 42 rumus, 26 kekeliruan, 28 rujukan
 │   │   ├── i18n.ts     Dwibahasa ID/EN
 │   │   └── ui.ts       Pembantu DOM, tanpa kerangka kerja
 │   └── index.html

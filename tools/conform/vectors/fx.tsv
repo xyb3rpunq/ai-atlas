@@ -1,0 +1,20 @@
+# ai-atlas vektor uji lintas bahasa — .Deckyx
+# berkas: fx.tsv
+# keterbandingan: BitExact
+# Pola bit pecahan yang menuntut ketelitian penuh, termasuk nilai batas
+# seluruh pecahan ditulis sebagai 16 digit heksadesimal pola bit IEEE-754
+# kolom: label	hex	decimal_text
+nol	0000000000000000	0.0
+nol_negatif	8000000000000000	-0.0
+satu	3ff0000000000000	1.0
+sepersepuluh	3fb999999999999a	0.1
+nol_koma_empat_dua	3fdae147ae147ae1	0.42
+hasil_bayes_hoaks	3fdae147ae147ae2	0.42000000000000004
+pi	400921fb54442d18	3.141592653589793
+terkecil_positif	0010000000000000	2.2250738585072014e-308
+terbesar	7fefffffffffffff	1.7976931348623157e308
+terkecil	ffefffffffffffff	-1.7976931348623157e308
+subnormal	0000000000000001	5e-324
+takhingga	7ff0000000000000	inf
+takhingga_negatif	fff0000000000000	-inf
+sepertiga	3fd5555555555555	0.3333333333333333

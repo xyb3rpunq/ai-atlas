@@ -1,0 +1,17 @@
+# ai-atlas vektor uji lintas bahasa — .Deckyx
+# berkas: ml_entropy.tsv
+# keterbandingan: NearlyEqual(4)
+# Entropi Shannon dan perolehan informasi; memakai log2
+# seluruh pecahan ditulis sebagai 16 digit heksadesimal pola bit IEEE-754
+# kolom: op	labels	values	result_hex
+entropy	A		8000000000000000
+entropy	A,B		3ff0000000000000
+entropy	A,A,B,B		3ff0000000000000
+entropy	A,A,A,B		3fe9f5fd8a9063e3
+entropy	A,B,C,D		4000000000000000
+entropy	Ya,Tidak,Ya,Ya,Tidak		3fef1206fb26ddae
+entropy	Tidak,Tidak,Ya,Ya,Ya,Tidak,Ya,Tidak,Ya,Ya,Ya,Ya,Ya,Tidak		3fee16d2942c1b98
+information_gain	Tidak,Tidak,Ya,Ya,Ya,Tidak,Ya,Tidak,Ya,Ya,Ya,Ya,Ya,Tidak	cuaca=Cerah,Cerah,Mendung,Hujan,Hujan,Hujan,Mendung,Cerah,Cerah,Hujan,Cerah,Mendung,Mendung,Hujan	3fcf957f831cd070
+information_gain	Tidak,Tidak,Ya,Ya,Ya,Tidak,Ya,Tidak,Ya,Ya,Ya,Ya,Ya,Tidak	suhu=Panas,Panas,Panas,Sejuk,Dingin,Dingin,Dingin,Sejuk,Dingin,Sejuk,Sejuk,Sejuk,Panas,Sejuk	3f9dec852f3ddfc0
+information_gain	Tidak,Tidak,Ya,Ya,Ya,Tidak,Ya,Tidak,Ya,Ya,Ya,Ya,Ya,Tidak	kelembapan=Tinggi,Tinggi,Tinggi,Tinggi,Normal,Normal,Normal,Tinggi,Normal,Normal,Normal,Tinggi,Normal,Tinggi	3fc36f58805c8bf0
+information_gain	Tidak,Tidak,Ya,Ya,Ya,Tidak,Ya,Tidak,Ya,Ya,Ya,Ya,Ya,Tidak	angin=Lemah,Kuat,Lemah,Lemah,Lemah,Kuat,Kuat,Lemah,Lemah,Lemah,Kuat,Kuat,Lemah,Kuat	3fa8a41b2b507160

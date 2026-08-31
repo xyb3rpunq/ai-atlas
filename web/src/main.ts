@@ -11,6 +11,7 @@ import "./style.css";
 import * as engine from "./engine.js";
 import { T, lang, onLangChange, pick, restoreLang, setLang } from "./i18n.js";
 import { LABS, SYLLABUS, findLab, type Lab } from "./labs/registry.js";
+import { notesFor } from "./labs/notes.js";
 import { clear, el } from "./ui.js";
 
 const THEME_KEY = "ai-atlas:theme";
@@ -203,9 +204,96 @@ function homePage(): HTMLElement {
   });
 }
 
+/**
+ * Bagian catatan dan definisi, digambar seragam untuk seluruh laboratorium.
+ *
+ * Dirender terpusat di sini, bukan di tiap berkas laboratorium, supaya
+ * susunannya tidak pelan-pelan menyimpang satu sama lain seiring waktu.
+ */
+function notesSection(slug: string): HTMLElement | null {
+  const notes = notesFor(slug);
+  if (!notes) return null;
+
+  const bagian: HTMLElement[] = [
+    el("p", { class: "note note--lead", text: pick(notes.summary) }),
+  ];
+
+  if (notes.definitions.length > 0) {
+    bagian.push(
+      el("h3", { class: "notes__heading", text: pick(T.definitions) }),
+      el("dl", {
+        class: "defs",
+        children: notes.definitions.flatMap((d) => [
+          el("dt", { text: d.term }),
+          el("dd", { text: pick(d.meaning) }),
+        ]),
+      }),
+    );
+  }
+
+  if (notes.formulas.length > 0) {
+    bagian.push(
+      el("h3", { class: "notes__heading", text: pick(T.formulas) }),
+      el("div", {
+        class: "formulas",
+        children: notes.formulas.map((f) =>
+          el("div", {
+            class: "formula",
+            children: [
+              el("div", { class: "formula__name", text: f.name }),
+              el("pre", { class: "formula__body", text: f.expression }),
+              el("p", { class: "formula__note", text: pick(f.note) }),
+            ],
+          }),
+        ),
+      }),
+    );
+  }
+
+  if (notes.pitfalls.length > 0) {
+    bagian.push(
+      el("h3", { class: "notes__heading", text: pick(T.pitfalls) }),
+      el("ul", {
+        class: "pitfalls",
+        children: notes.pitfalls.map((p) => el("li", { text: pick(p) })),
+      }),
+    );
+  }
+
+  if (notes.references.length > 0) {
+    bagian.push(
+      el("h3", { class: "notes__heading", text: pick(T.references) }),
+      el("ul", {
+        class: "refs",
+        children: notes.references.map((r) =>
+          el("li", {
+            children: [
+              r.url
+                ? el("a", {
+                    attrs: { href: r.url, rel: "noopener", target: "_blank" },
+                    text: r.text,
+                  })
+                : el("span", { text: r.text }),
+            ],
+          }),
+        ),
+      }),
+    );
+  }
+
+  return el("section", {
+    class: "card notes",
+    children: [
+      el("h2", { class: "card__title", text: pick(T.notes) }),
+      ...bagian,
+    ],
+  });
+}
+
 /** Halaman satu laboratorium. */
 function labPage(lab: Lab): HTMLElement {
   const body = el("div");
+  const catatan = notesSection(lab.slug);
   const page = el("div", {
     children: [
       el("header", {
@@ -220,6 +308,7 @@ function labPage(lab: Lab): HTMLElement {
         ],
       }),
       body,
+      catatan,
     ],
   });
   disposeLab = lab.mount(body);
