@@ -73,7 +73,7 @@ Karena itu seluruh vektor uji lintas bahasa memakai **16 digit heksadesimal pola
 | 06 | Logika Fuzzy II | **Mamdani, Sugeno, Tsukamoto** berdampingan, 5 metode defuzzifikasi | ✅ |
 | 07 | Representasi Pengetahuan | Logika proposisi, resolusi, jaringan semantik, bingkai | ⏳ |
 | 08 | Teknik Pencarian | **Sembilan algoritma** diadu di satu peta: BFS, DFS, DLS, IDDFS, UCS, Greedy, **A\***, hill climbing, annealing | ✅ |
-| 09 | Jaringan Syaraf Tiruan | Perceptron, **backpropagation**, kurva galat langsung | ⏳ |
+| 09 | Jaringan Syaraf Tiruan | Perceptron, **backpropagation** yang diverifikasi gradien numerik, batas keputusan & kurva galat langsung | ✅ |
 | 10 | Pemrosesan Bahasa Alami | Tokenisasi, stemming Bahasa Indonesia, TF-IDF | ⏳ |
 | 11 | Sistem Pakar | **Forward & backward chaining**, fasilitas penjelasan | ⏳ |
 | 12 | Sains Data & Big Data | Statistik, normalisasi, deteksi pencilan, matriks konfusi | ⏳ |
@@ -88,10 +88,10 @@ Batas ini diperiksa otomatis di CI. Build gagal kalau terlampaui — bukan sekad
 
 | Metrik | Anggaran | Terukur |
 |--------|---------:|--------:|
-| WebAssembly (gzip) | ≤ 400 KB | **93,0 KB** |
-| JavaScript (gzip) | ≤ 60 KB | **13,7 KB** |
+| WebAssembly (gzip) | ≤ 400 KB | **107 KB** |
+| JavaScript (gzip) | ≤ 60 KB | **16,4 KB** |
 | CSS (gzip) | ≤ 20 KB | **2,8 KB** |
-| Total muat pertama (gzip) | ≤ 460 KB | **115,4 KB** |
+| Total muat pertama (gzip) | ≤ 460 KB | **132,0 KB** |
 | Dependensi saat berjalan | 0 | **0** |
 
 Tidak ada React, tidak ada kerangka kerja, tidak ada CDN. Seluruh antarmukanya hanya beberapa lusin simpul DOM, jadi membangunnya langsung lebih ringan daripada memuat pustaka mana pun.
@@ -133,13 +133,27 @@ Setiap fungsi publik punya uji. Bukan uji jalur bahagia saja — uji nilai batas
 | `certainty.rs` | 9 | 26 |
 | `bayes.rs` | 21 | 36 |
 | `fuzzy.rs` | 24 | 42 |
-| `search.rs` | 22 | 41 |
+| `search.rs` | 22 | 44 |
+| `neural.rs` | 30 | 40 |
 | `fx.rs` | 8 | 17 |
 | `rng.rs` | 9 | 16 |
 | `lib.rs` | 2 | 4 |
-| `ai-wasm/lib.rs` | 16 | 20 |
+| `ai-wasm/lib.rs` | 20 | 28 |
 | `web/src/ui.ts` | 11 | 15 |
-| **Total** | **122** | **237** |
+| **Total** | **156** | **283** |
+
+Beberapa uji yang menahan seluruh proyek ini tetap jujur:
+
+- **Pemeriksaan gradien** — perambatan balik dibandingkan dengan selisih hingga
+  pada tiap bobot. Jaringan yang gradiennya salah tetap sering "belajar", hanya
+  lebih lambat dan berhenti di tempat yang keliru; hanya uji inilah yang
+  membedakannya dari yang benar.
+- **Perbandingan optimalitas** — BFS, IDDFS, UCS, dan A\* harus menghasilkan
+  biaya jalur yang identik pada peta yang sama.
+- **Monotonisitas fuzzy** — menaikkan mutu masukan tidak boleh menurunkan
+  keluaran. Uji inilah yang menemukan bug himpunan bahu.
+- **Reproduktifitas** — benih yang sama harus menghasilkan bobot, labirin, dan
+  jejak pencarian yang identik bit demi bit.
 
 Contoh kasus yang dipakai sebagai uji berasal langsung dari lembar tugas mata kuliah:
 
@@ -176,6 +190,7 @@ ai-atlas/
 │   │       ├── bayes.rs       Sesi 4 — Bayesian
 │   │       ├── fuzzy.rs       Sesi 5-6 — Logika Fuzzy
 │   │       ├── search.rs      Sesi 8 — Teknik Pencarian
+│   │       ├── neural.rs      Sesi 9 — Jaringan Syaraf Tiruan
 │   │       ├── fx.rs          Pertukaran pecahan bit-eksak
 │   │       └── rng.rs         SplitMix64 deterministik
 │   └── ai-wasm/        Jembatan wasm-bindgen. Amplop JSON ok/err.

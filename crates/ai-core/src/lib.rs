@@ -23,6 +23,7 @@
 //! | 4 | Probabilitas Bayesian | [`bayes`] |
 //! | 5-6 | Logika Fuzzy | [`fuzzy`] |
 //! | 8 | Teknik Pencarian | [`search`] |
+//! | 9 | Jaringan Syaraf Tiruan | [`neural`] |
 //! | — | Penunjang: keacakan deterministik | [`rng`] |
 //! | — | Penunjang: pertukaran pecahan bit-eksak | [`fx`] |
 
@@ -34,6 +35,7 @@ pub mod bayes;
 pub mod certainty;
 pub mod fuzzy;
 pub mod fx;
+pub mod neural;
 pub mod rng;
 pub mod search;
 
@@ -84,6 +86,12 @@ pub const SESSIONS: &[SessionInfo] = &[
         module: "search",
         title_id: "Teknik Pencarian dan Pelacakan",
         title_en: "Search Techniques",
+    },
+    SessionInfo {
+        session: 9,
+        module: "neural",
+        title_id: "Jaringan Syaraf Tiruan",
+        title_en: "Artificial Neural Networks",
     },
 ];
 

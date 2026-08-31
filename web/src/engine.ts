@@ -383,3 +383,129 @@ export function searchCompare(
     ),
   );
 }
+
+// ---------------------------------------------------------------------------
+// Sesi 9 — Jaringan Syaraf Tiruan
+// ---------------------------------------------------------------------------
+
+/** Fungsi aktivasi yang dikenali mesin. */
+export type Activation = "step" | "sigmoid" | "tanh" | "relu" | "leaky_relu" | "linear";
+
+/** Satu lapisan jaringan. */
+export interface Layer {
+  weights: number[][];
+  biases: number[];
+  activation: Activation;
+}
+
+/** Keadaan jaringan yang bisa disimpan dan dilanjutkan. */
+export interface NeuralNetwork {
+  layers: Layer[];
+  learning_rate: number;
+  momentum: number;
+}
+
+/** Ringkasan jaringan beserta angka yang layak ditampilkan. */
+export interface NetworkSummary {
+  network: NeuralNetwork;
+  input_size: number;
+  output_size: number;
+  parameters: number;
+  /**
+   * Laju belajar setelah memperhitungkan momentum, kira-kira
+   * `laju / (1 - momentum)`. Pada momentum 0,9 nilainya sepuluh kali lipat.
+   */
+  effective_learning_rate: number;
+  /** Benar bila langkah efektifnya berada di wilayah yang cenderung menyimpang. */
+  step_risky: boolean;
+}
+
+/** Catatan satu epoch pelatihan. */
+export interface EpochRecord {
+  epoch: number;
+  loss: number;
+  accuracy: number;
+}
+
+/** Hasil satu potongan pelatihan. */
+export interface TrainResult {
+  summary: NetworkSummary;
+  history: EpochRecord[];
+}
+
+/** Kumpulan data latih. */
+export interface Dataset {
+  x: number[][];
+  y: number[][];
+}
+
+/** Kisi keluaran jaringan, dipakai menggambar batas keputusan. */
+export interface DecisionGrid {
+  resolution: number;
+  min: number;
+  max: number;
+  values: number[];
+}
+
+/** Membuat jaringan baru. */
+export function neuralCreate(
+  sizes: number[],
+  hidden: Activation,
+  output: Activation,
+  learningRate: number,
+  momentum: number,
+  seed: number,
+): NetworkSummary {
+  return unwrap<NetworkSummary>(
+    wasm.neural_create(
+      JSON.stringify(sizes),
+      hidden,
+      output,
+      learningRate,
+      momentum,
+      BigInt(seed),
+    ),
+  );
+}
+
+/** Kumpulan data bawaan. */
+export function neuralDataset(
+  name: "xor" | "and" | "or" | "spiral",
+  points: number,
+  noise: number,
+  seed: number,
+): Dataset {
+  return unwrap<Dataset>(wasm.neural_dataset(name, points, noise, BigInt(seed)));
+}
+
+/** Melatih satu potongan epoch. */
+export function neuralTrain(
+  network: NeuralNetwork,
+  data: Dataset,
+  epochs: number,
+  tolerance: number,
+  seed: number,
+): TrainResult {
+  return unwrap<TrainResult>(
+    wasm.neural_train(
+      JSON.stringify(network),
+      JSON.stringify(data.x),
+      JSON.stringify(data.y),
+      epochs,
+      tolerance,
+      BigInt(seed),
+    ),
+  );
+}
+
+/** Keluaran jaringan pada kisi seragam. */
+export function neuralDecisionGrid(
+  network: NeuralNetwork,
+  min: number,
+  max: number,
+  resolution: number,
+): DecisionGrid {
+  return unwrap<DecisionGrid>(
+    wasm.neural_decision_grid(JSON.stringify(network), min, max, resolution),
+  );
+}

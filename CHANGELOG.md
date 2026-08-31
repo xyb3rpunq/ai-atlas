@@ -8,6 +8,11 @@ penomoran mengikuti [Semantic Versioning](https://semver.org/lang/id/).
 ## [Belum dirilis]
 
 ### Ditambahkan
+- Sesi 9 — Jaringan Syaraf Tiruan. Perceptron satu lapis, jaringan berlapis
+  dengan perambatan balik dan momentum, enam fungsi aktivasi, inisialisasi
+  Xavier, dan empat kumpulan data (XOR, AND, OR, spiral). Batas keputusan
+  digambar ulang secara langsung selama pelatihan; kisi 72x72 berarti 5.184
+  perambatan maju dan selesai dalam 18 milidetik.
 - Sesi 8 — Teknik Pencarian. Sembilan algoritma di atas satu peta yang bisa
   digambar sendiri: BFS, DFS, DLS, IDDFS, UCS, greedy best-first, A\*, hill
   climbing, dan simulated annealing. Yang dianimasikan adalah urutan sel yang
@@ -22,6 +27,19 @@ penomoran mengikuti [Semantic Versioning](https://semver.org/lang/id/).
   situs, `robots.txt`, data terstruktur `LearningResource`, dan halaman 404.
 
 ### Diperbaiki
+- **Jaringan hasil deserialisasi langsung meledak saat dilatih.** Kecepatan
+  momentum tidak ikut diserialisasi, sehingga jaringan yang dibaca kembali dari
+  JSON datang dengan penyangga kosong dan pembaruan bobot mengindeks di luar
+  batas. Ini bukan kasus pinggiran: antarmuka menyimpan jaringan sebagai JSON di
+  antara potongan pelatihan supaya tampilan tidak membeku, jadi setiap potongan
+  setelah yang pertama melewatinya. Penyangga kini dibangun ulang bila bentuknya
+  tidak cocok.
+- **Panel kontrol digambar ulang enam puluh kali sedetik selama pelatihan.**
+  Penggeser yang sedang diseret terlepas dari jari pengguna dan fokus papan
+  ketik kembali ke awal. Kini hanya gambar dan angka hasil yang disegarkan.
+- **Kumpulan data spiral mustahil dipisahkan sempurna.** Kedua lengan dimulai
+  dari titik asal, sehingga titik terdalam kedua kelas berimpit dan angka
+  ketepatan menjadi menyesatkan. Jari-jari terdalam kini bukan nol.
 - **A\* melebar percuma di ruang terbuka.** Tanpa pemutus seri, ribuan simpul
   bernilai `f` identik sehingga A\* membuka seluruh kisi 21x21 — 441 sel, sama
   banyak dengan pencarian tanpa heuristik. Seri kini diputus dengan taksiran

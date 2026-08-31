@@ -396,6 +396,202 @@ pub fn search_compare(
     ok(rows)
 }
 
+// ---------------------------------------------------------------------------
+// Sesi 9 — Jaringan Syaraf Tiruan
+// ---------------------------------------------------------------------------
+
+/// Membaca nama aktivasi.
+fn parse_activation(name: &str) -> Result<ai_core::neural::Activation, String> {
+    use ai_core::neural::Activation;
+    Ok(match name.to_ascii_lowercase().as_str() {
+        "step" => Activation::Step,
+        "sigmoid" => Activation::Sigmoid,
+        "tanh" => Activation::Tanh,
+        "relu" => Activation::Relu,
+        "leaky_relu" => Activation::LeakyRelu,
+        "linear" => Activation::Linear,
+        other => return Err(format!("aktivasi tidak dikenal: {other}")),
+    })
+}
+
+/// Ringkasan jaringan beserta bobotnya, siap dikirim ke antarmuka.
+#[derive(Serialize)]
+struct NetworkSummary {
+    network: ai_core::neural::Network,
+    input_size: usize,
+    output_size: usize,
+    parameters: usize,
+    effective_learning_rate: f64,
+    step_risky: bool,
+}
+
+impl NetworkSummary {
+    fn of(net: &ai_core::neural::Network) -> Self {
+        Self {
+            network: net.clone(),
+            input_size: net.input_size(),
+            output_size: net.output_size(),
+            parameters: net.parameter_count(),
+            effective_learning_rate: net.effective_learning_rate(),
+            step_risky: net.is_step_risky(),
+        }
+    }
+}
+
+/// Membuat jaringan baru dan mengembalikannya sebagai JSON.
+///
+/// `sizes_json` berbentuk `[2,8,8,2]`: jumlah masukan, lalu ukuran tiap lapisan.
+#[wasm_bindgen]
+pub fn neural_create(
+    sizes_json: &str,
+    hidden_activation: &str,
+    output_activation: &str,
+    learning_rate: f64,
+    momentum: f64,
+    seed: u64,
+) -> String {
+    let sizes: Vec<usize> = match serde_json::from_str(sizes_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let hidden = match parse_activation(hidden_activation) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let output = match parse_activation(output_activation) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    match ai_core::neural::Network::new(&sizes, hidden, output, learning_rate, momentum, seed) {
+        Ok(net) => ok(NetworkSummary::of(&net)),
+        Err(e) => err(e),
+    }
+}
+
+/// Kumpulan data siap latih.
+#[wasm_bindgen]
+pub fn neural_dataset(name: &str, points: usize, noise: f64, seed: u64) -> String {
+    #[derive(Serialize)]
+    struct Data {
+        x: Vec<Vec<f64>>,
+        y: Vec<Vec<f64>>,
+    }
+    let (x, y) = match name.to_ascii_lowercase().as_str() {
+        "xor" => ai_core::neural::xor_dataset(),
+        "and" => {
+            let (x, y) = ai_core::neural::and_dataset();
+            (x, y.into_iter().map(|v| vec![v]).collect())
+        }
+        "or" => {
+            let (x, y) = ai_core::neural::or_dataset();
+            (x, y.into_iter().map(|v| vec![v]).collect())
+        }
+        "spiral" => ai_core::neural::spiral_dataset(points, noise, seed),
+        other => return err(format!("kumpulan data tidak dikenal: {other}")),
+    };
+    ok(Data { x, y })
+}
+
+/// Melatih jaringan sejumlah epoch lalu mengembalikan keadaan barunya.
+///
+/// Pelatihan dipecah menjadi potongan kecil oleh sisi antarmuka supaya utas
+/// tampilan tidak membeku; fungsi ini hanya mengerjakan satu potongan.
+#[wasm_bindgen]
+pub fn neural_train(
+    network_json: &str,
+    x_json: &str,
+    y_json: &str,
+    epochs: usize,
+    tolerance: f64,
+    seed: u64,
+) -> String {
+    let mut net: ai_core::neural::Network = match serde_json::from_str(network_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let x: Vec<Vec<f64>> = match serde_json::from_str(x_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let y: Vec<Vec<f64>> = match serde_json::from_str(y_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    match net.train(&x, &y, epochs, tolerance, seed) {
+        Ok(history) => {
+            #[derive(Serialize)]
+            struct Out {
+                summary: NetworkSummary,
+                history: Vec<ai_core::neural::EpochRecord>,
+            }
+            ok(Out {
+                summary: NetworkSummary::of(&net),
+                history,
+            })
+        }
+        Err(e) => err(e),
+    }
+}
+
+/// Keluaran jaringan pada kisi seragam, untuk menggambar batas keputusan.
+///
+/// Inilah bagian yang paling berat: sebuah kisi 100x100 berarti sepuluh ribu
+/// perambatan maju. Dikerjakan di WebAssembly, ini selesai dalam hitungan
+/// milidetik; di JavaScript murni, tampilan akan tersendat.
+#[wasm_bindgen]
+pub fn neural_decision_grid(network_json: &str, min: f64, max: f64, resolution: usize) -> String {
+    let net: ai_core::neural::Network = match serde_json::from_str(network_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    if net.input_size() != 2 {
+        return err("batas keputusan hanya bisa digambar untuk dua masukan");
+    }
+    if !(2..=400).contains(&resolution) {
+        return err(format!(
+            "resolusi harus antara 2 dan 400, diberi {resolution}"
+        ));
+    }
+    if !min.is_finite() || !max.is_finite() || min >= max {
+        return err(format!("rentang tidak sah: {min} sampai {max}"));
+    }
+
+    let step = (max - min) / (resolution - 1) as f64;
+    let mut values = Vec::with_capacity(resolution * resolution);
+    for j in 0..resolution {
+        for i in 0..resolution {
+            let x = min + step * i as f64;
+            let y = min + step * j as f64;
+            match net.predict(&[x, y]) {
+                Ok(out) => {
+                    // Satu keluaran dibaca apa adanya; dua keluaran dinyatakan
+                    // sebagai selisih, sehingga nilai tengah menandai batas.
+                    let v = if out.len() == 1 {
+                        out[0]
+                    } else {
+                        (out[0] - out[1] + 1.0) / 2.0
+                    };
+                    values.push(v);
+                }
+                Err(e) => return err(e),
+            }
+        }
+    }
+    #[derive(Serialize)]
+    struct Out {
+        resolution: usize,
+        min: f64,
+        max: f64,
+        values: Vec<f64>,
+    }
+    ok(Out {
+        resolution,
+        min,
+        max,
+        values,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -621,5 +817,97 @@ mod tests {
         assert!(search_compare("bukan", 0, 0, 8, 8, OPSI).contains("err"));
         assert!(search_compare(&kisi_uji(), 0, 0, 8, 8, "{").contains("err"));
         assert!(search_compare(&kisi_uji(), 0, 0, 99, 99, OPSI).contains("err"));
+    }
+
+    fn jaringan_uji() -> String {
+        let out = neural_create("[2,4,1]", "tanh", "sigmoid", 0.1, 0.9, 1);
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        serde_json::to_string(&v["ok"]["network"]).unwrap()
+    }
+
+    #[test]
+    fn membuat_jaringan_lewat_jembatan() {
+        // Laju 0,05 dengan momentum 0,9 memberi langkah efektif 0,5 — jelas di
+        // bawah ambang. Nilai 0,1 sengaja dihindari di sini: 0.1 / (1 - 0.9)
+        // menghasilkan 1.0000000000000002 pada aritmetika biner, tepat
+        // menyerempet ambang, sehingga ujinya akan rapuh tanpa alasan.
+        let out = neural_create("[2,4,1]", "tanh", "sigmoid", 0.05, 0.9, 1);
+        assert!(out.contains(r#""parameters":17"#), "{out}");
+        assert!(out.contains("effective_learning_rate"));
+        assert!(out.contains(r#""step_risky":false"#), "{out}");
+    }
+
+    #[test]
+    fn membuat_jaringan_menolak_masukan_salah() {
+        assert!(neural_create("bukan", "tanh", "sigmoid", 0.1, 0.9, 1).contains("err"));
+        assert!(neural_create("[2,4,1]", "entah", "sigmoid", 0.1, 0.9, 1).contains("err"));
+        assert!(neural_create("[2,4,1]", "tanh", "entah", 0.1, 0.9, 1).contains("err"));
+        // Ambang keras tidak bisa dilatih perambatan balik.
+        assert!(neural_create("[2,4,1]", "step", "sigmoid", 0.1, 0.9, 1).contains("err"));
+        assert!(neural_create("[2]", "tanh", "sigmoid", 0.1, 0.9, 1).contains("err"));
+        assert!(neural_create("[2,4,1]", "tanh", "sigmoid", 0.0, 0.9, 1).contains("err"));
+    }
+
+    #[test]
+    fn langkah_berisiko_ditandai() {
+        // 0.2 / (1 - 0.9) = 2.0, susunan yang terbukti gagal pada spiral.
+        let out = neural_create("[2,4,1]", "tanh", "sigmoid", 0.2, 0.9, 1);
+        assert!(out.contains(r#""step_risky":true"#), "{out}");
+    }
+
+    #[test]
+    fn kumpulan_data_lewat_jembatan() {
+        for nama in ["xor", "and", "or", "spiral"] {
+            let out = neural_dataset(nama, 20, 0.03, 1);
+            assert!(!out.contains(r#""err""#), "{nama}: {out}");
+            assert!(out.contains(r#""x":[["#), "{nama}: {out}");
+        }
+        assert!(neural_dataset("entah", 20, 0.03, 1).contains("err"));
+    }
+
+    #[test]
+    fn pelatihan_lewat_jembatan() {
+        let data = neural_dataset("xor", 0, 0.0, 1);
+        let v: serde_json::Value = serde_json::from_str(&data).unwrap();
+        let x = serde_json::to_string(&v["ok"]["x"]).unwrap();
+        let y = serde_json::to_string(&v["ok"]["y"]).unwrap();
+
+        let out = neural_train(&jaringan_uji(), &x, &y, 50, 1e-4, 7);
+        assert!(!out.contains(r#""err""#), "{out}");
+        assert!(out.contains("history"));
+        assert!(out.contains(r#""epoch":1"#));
+    }
+
+    #[test]
+    fn pelatihan_menolak_masukan_salah() {
+        assert!(neural_train("bukan", "[]", "[]", 10, 0.0, 1).contains("err"));
+        assert!(neural_train(&jaringan_uji(), "bukan", "[]", 10, 0.0, 1).contains("err"));
+        assert!(neural_train(&jaringan_uji(), "[[0,0]]", "bukan", 10, 0.0, 1).contains("err"));
+        // Data kosong harus jadi galat, bukan riwayat kosong yang membingungkan.
+        assert!(neural_train(&jaringan_uji(), "[]", "[]", 10, 0.0, 1).contains("err"));
+    }
+
+    #[test]
+    fn kisi_keputusan_lewat_jembatan() {
+        let out = neural_decision_grid(&jaringan_uji(), -1.0, 1.0, 20);
+        assert!(out.contains(r#""resolution":20"#), "{out}");
+        assert!(out.contains("values"));
+    }
+
+    #[test]
+    fn kisi_keputusan_menolak_masukan_salah() {
+        let net = jaringan_uji();
+        assert!(neural_decision_grid("bukan", -1.0, 1.0, 20).contains("err"));
+        assert!(neural_decision_grid(&net, -1.0, 1.0, 1).contains("err"));
+        assert!(neural_decision_grid(&net, -1.0, 1.0, 999).contains("err"));
+        assert!(neural_decision_grid(&net, 1.0, -1.0, 20).contains("err"));
+        assert!(neural_decision_grid(&net, f64::NAN, 1.0, 20).contains("err"));
+
+        // Jaringan dengan jumlah masukan lain harus ditolak, bukan menghasilkan
+        // gambar yang terlihat masuk akal tetapi tidak bermakna.
+        let tiga = neural_create("[3,4,1]", "tanh", "sigmoid", 0.1, 0.0, 1);
+        let v: serde_json::Value = serde_json::from_str(&tiga).unwrap();
+        let net3 = serde_json::to_string(&v["ok"]["network"]).unwrap();
+        assert!(neural_decision_grid(&net3, -1.0, 1.0, 20).contains("err"));
     }
 }
