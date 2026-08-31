@@ -79,8 +79,8 @@ Penggolongan ini menentukan bentuk harness Go dan PL/SQL nanti. Tanpa itu, selur
 
 | Sesi | Topik | Yang bisa Anda mainkan | Status |
 |:----:|-------|------------------------|:------:|
-| 01 | Pengantar Kecerdasan Buatan | ELIZA (1966), uji Turing | ⏳ |
-| 02 | Agen Cerdas & Ruang Keadaan | Dunia penyedot debu, empat jenis agen | ⏳ |
+| 01 | Pengantar Kecerdasan Buatan | **ELIZA (1966)** dengan mesinnya dibiarkan terbuka: aturan mana yang menang dan mengapa | ✅ |
+| 02 | Agen Cerdas & Ruang Keadaan | **Empat jenis agen** diadu di satu dunia, teko air, misionaris & kanibal | ✅ |
 | 03 | Ketidakpastian | **Certainty Factor MYCIN**, MB/MD, kombinasi paralel & berantai | ✅ |
 | 04 | Probabilitas Bayesian | **Teorema Bayes**, Naive Bayes, diagram 1.000 kasus | ✅ |
 | 05 | Logika Fuzzy I | **Enam bentuk fungsi keanggotaan**, operasi Zadeh & produk, potongan alfa | ✅ |
@@ -92,9 +92,9 @@ Penggolongan ini menentukan bentuk harness Go dan PL/SQL nanti. Tanpa itu, selur
 | 11 | Sistem Pakar | **Runut maju & mundur** pada basis pengetahuan yang sama, pemangkasan pertanyaan, fasilitas penjelasan | ✅ |
 | 12 | Sains Data & Big Data | Penskalaan, matriks konfusi, presisi/kepekaan/F1, **ketepatan pembanding** | ✅ |
 | 13 | Machine Learning | **KNN** dengan wilayah keputusan, **K-Means++**, **pohon ID3** dengan entropi & perolehan informasi, regresi | ✅ |
-| 14 | Robotika | Kinematika, kendali PID, medan potensial | ⏳ |
+| 14 | Robotika | Penggerak diferensial, **kendali PID** beserta ayunannya, kinematika balik, **minimum lokal** medan potensial | ✅ |
 
-Sesi bertanda ⏳ sudah terpetakan di antarmuka tetapi mesinnya belum selesai. Statusnya ditampilkan apa adanya, bukan disembunyikan.
+Seluruh empat belas sesi sudah terimplementasi dan bisa dijalankan. Tidak ada bagian yang berstatus "segera".
 
 ## Anggaran performa
 
@@ -102,8 +102,8 @@ Batas ini diperiksa otomatis di CI. Build gagal kalau terlampaui — bukan sekad
 
 | Metrik | Anggaran | Terukur |
 |--------|---------:|--------:|
-| WebAssembly (gzip) | ≤ 400 KB | **107 KB** |
-| JavaScript (gzip) | ≤ 60 KB | **16,4 KB** |
+| WebAssembly (gzip) | ≤ 400 KB | **228 KB** |
+| JavaScript (gzip) | ≤ 60 KB | **40 KB** |
 | CSS (gzip) | ≤ 20 KB | **2,8 KB** |
 | Total muat pertama (gzip) | ≤ 460 KB | **219,7 KB** |
 | Dependensi saat berjalan | 0 | **0** |
@@ -153,12 +153,15 @@ Setiap fungsi publik punya uji. Bukan uji jalur bahagia saja — uji nilai batas
 | `ml.rs` | 30 | 50 |
 | `nlp.rs` | 22 | 43 |
 | `knowledge.rs` | 28 | 42 |
+| `agent.rs` | 22 | 29 |
+| `eliza.rs` | 10 | 17 |
+| `robotics.rs` | 18 | 26 |
 | `fx.rs` | 8 | 17 |
 | `rng.rs` | 9 | 16 |
 | `lib.rs` | 2 | 4 |
-| `ai-wasm/lib.rs` | 44 | 60 |
+| `ai-wasm/lib.rs` | 55 | 70 |
 | `web/src/ui.ts` | 11 | 15 |
-| **Total** | **282** | **485** |
+| **Total** | **343** | **577** |
 
 Beberapa uji yang menahan seluruh proyek ini tetap jujur:
 
@@ -210,9 +213,12 @@ ai-atlas/
 │   │       ├── search.rs      Sesi 8 — Teknik Pencarian
 │   │       ├── neural.rs      Sesi 9 — Jaringan Syaraf Tiruan
 │   │       ├── expert.rs      Sesi 11 — Sistem Pakar
+│   │       ├── eliza.rs       Sesi 1 — ELIZA
+│   │       ├── agent.rs       Sesi 2 — Agen & Ruang Keadaan
 │   │       ├── knowledge.rs   Sesi 7 — Representasi Pengetahuan
 │   │       ├── nlp.rs         Sesi 10 — Pemrosesan Bahasa Alami
 │   │       ├── ml.rs          Sesi 12-13 — Sains Data & Machine Learning
+│   │       ├── robotics.rs    Sesi 14 — Robotika
 │   │       ├── fx.rs          Pertukaran pecahan bit-eksak
 │   │       └── rng.rs         SplitMix64 deterministik
 │   └── ai-wasm/        Jembatan wasm-bindgen. Amplop JSON ok/err.

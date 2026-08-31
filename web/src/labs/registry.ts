@@ -8,13 +8,16 @@
 
 import type { Bilingual } from "../i18n.js";
 import { bi } from "../i18n.js";
+import { agentLab } from "./agent.js";
 import { bayesLab } from "./bayes.js";
 import { certaintyLab } from "./certainty.js";
 import { fuzzyLab } from "./fuzzy.js";
+import { elizaLab } from "./eliza.js";
 import { expertLab } from "./expert.js";
 import { knowledgeLab } from "./knowledge.js";
 import { mlLab } from "./ml.js";
 import { nlpLab } from "./nlp.js";
+import { roboticsLab } from "./robotics.js";
 import { neuralLab } from "./neural.js";
 import { searchLab } from "./search.js";
 
@@ -44,6 +47,8 @@ export interface PlannedLab {
 
 /** Sesi yang sudah bisa dijalankan. */
 export const LABS: Lab[] = [
+  elizaLab,
+  agentLab,
   certaintyLab,
   bayesLab,
   fuzzyLab,
@@ -53,12 +58,13 @@ export const LABS: Lab[] = [
   mlLab,
   nlpLab,
   knowledgeLab,
+  roboticsLab,
 ];
 
 /** Seluruh sesi silabus, termasuk yang belum terimplementasi. */
 export const SYLLABUS: { session: number; title: Bilingual; slug?: string }[] = [
-  { session: 1, title: bi("Pengantar Kecerdasan Buatan", "Introduction to AI") },
-  { session: 2, title: bi("Agen Cerdas & Ruang Keadaan", "Agents & State Space") },
+  { session: 1, title: elizaLab.title, slug: elizaLab.slug },
+  { session: 2, title: agentLab.title, slug: agentLab.slug },
   { session: 3, title: certaintyLab.title, slug: certaintyLab.slug },
   { session: 4, title: bayesLab.title, slug: bayesLab.slug },
   { session: 5, title: bi("Logika Fuzzy I", "Fuzzy Logic I"), slug: fuzzyLab.slug },
@@ -70,7 +76,7 @@ export const SYLLABUS: { session: number; title: Bilingual; slug?: string }[] = 
   { session: 11, title: expertLab.title, slug: expertLab.slug },
   { session: 12, title: bi("Sains Data & Big Data", "Data Science & Big Data"), slug: mlLab.slug },
   { session: 13, title: mlLab.title, slug: mlLab.slug },
-  { session: 14, title: bi("Robotika", "Robotics") },
+  { session: 14, title: roboticsLab.title, slug: roboticsLab.slug },
 ];
 
 /** Mencari laboratorium berdasarkan slug-nya. */

@@ -1001,3 +1001,244 @@ export function logicResolve(knowledge: string[], conclusion: string): Resolutio
 export function logicSemanticNetwork(node: string): SemanticNetworkView {
   return unwrap<SemanticNetworkView>(wasm.logic_semantic_network(node));
 }
+
+// ---------------------------------------------------------------------------
+// Sesi 1 — Pengantar Kecerdasan Buatan (ELIZA)
+// ---------------------------------------------------------------------------
+
+/** Satu aturan pencocokan ELIZA. */
+export interface ElizaRule {
+  keyword: string;
+  priority: number;
+  responses: string[];
+}
+
+/** Naskah ELIZA lengkap. */
+export interface ElizaScript {
+  name: string;
+  rules: ElizaRule[];
+  fallbacks: string[];
+  reflections: [string, string][];
+}
+
+/** Balasan ELIZA beserta penjelasan bagaimana ia dihasilkan. */
+export interface ElizaReply {
+  text: string;
+  matched_keyword: string;
+  priority: number;
+  reflected_fragment: string;
+  used_fallback: boolean;
+}
+
+/** Ringkasan naskah, untuk membongkar ukuran sebenarnya. */
+export interface ElizaSummary {
+  name: string;
+  rules: number;
+  total_responses: number;
+  fallbacks: number;
+  reflections: number;
+  keywords: [string, number][];
+}
+
+/** Balasan ELIZA untuk sebuah masukan. */
+export function elizaRespond(input: string, seed: number): ElizaReply {
+  return unwrap<ElizaReply>(wasm.eliza_respond(input, BigInt(seed)));
+}
+
+/** Ringkasan naskah ELIZA. */
+export function elizaScriptSummary(): ElizaSummary {
+  return unwrap<ElizaSummary>(wasm.eliza_script_summary());
+}
+
+/** Naskah ELIZA lengkap. */
+export function elizaScript(): ElizaScript {
+  return unwrap<ElizaScript>(wasm.eliza_script());
+}
+
+// ---------------------------------------------------------------------------
+// Sesi 2 — Agen Cerdas dan Ruang Keadaan
+// ---------------------------------------------------------------------------
+
+/** Tindakan yang bisa diambil agen. */
+export type AgentAction = "suck" | "move_left" | "move_right" | "idle";
+
+/** Jenis agen. */
+export type AgentKind =
+  | "simple_reflex"
+  | "model_based"
+  | "goal_based"
+  | "utility_based";
+
+/** Satu langkah simulasi agen. */
+export interface AgentStep {
+  step: number;
+  position: number;
+  perceived_dirty: boolean;
+  action: AgentAction;
+  dirty_after: number;
+}
+
+/** Hasil menjalankan seorang agen. */
+export interface AgentRun {
+  kind: AgentKind;
+  steps: AgentStep[];
+  finished: boolean;
+  cost: number;
+  actions_taken: number;
+  wasted_moves: number;
+}
+
+/** Satu langkah penyelesaian teko air. */
+export interface JugStep {
+  action: string;
+  a: number;
+  b: number;
+}
+
+/** Satu langkah penyeberangan misionaris dan kanibal. */
+export interface CrossingStep {
+  action: string;
+  missionaries_left: number;
+  cannibals_left: number;
+  boat_left: boolean;
+}
+
+/** Menjalankan seluruh jenis agen pada dunia yang sama. */
+export function agentCompare(
+  dirty: boolean[],
+  position: number,
+  maxSteps: number,
+): AgentRun[] {
+  return unwrap<AgentRun[]>(
+    wasm.agent_compare(JSON.stringify(dirty), position, maxSteps),
+  );
+}
+
+/** Menjalankan satu jenis agen. */
+export function agentRun(
+  dirty: boolean[],
+  position: number,
+  kind: AgentKind,
+  maxSteps: number,
+): AgentRun {
+  return unwrap<AgentRun>(
+    wasm.agent_run(JSON.stringify(dirty), position, kind, maxSteps),
+  );
+}
+
+/** Menyelesaikan masalah teko air. */
+export function agentWaterJug(a: number, b: number, target: number): JugStep[] {
+  return unwrap<JugStep[]>(wasm.agent_water_jug(a, b, target));
+}
+
+/** Menyelesaikan masalah misionaris dan kanibal. */
+export function agentMissionaries(
+  missionaries: number,
+  cannibals: number,
+  boat: number,
+): CrossingStep[] {
+  return unwrap<CrossingStep[]>(
+    wasm.agent_missionaries(missionaries, cannibals, boat),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sesi 14 — Robotika
+// ---------------------------------------------------------------------------
+
+/** Satu langkah simulasi kendali. */
+export interface ControlStep {
+  time: number;
+  value: number;
+  error: number;
+  output: number;
+}
+
+/** Hasil simulasi kendali PID. */
+export interface ControlRun {
+  steps: ControlStep[];
+  settled: boolean;
+  /** Kosong bila sistemnya tidak pernah menetap. */
+  settling_time: number | null;
+  overshoot_percent: number;
+  final_error: number;
+}
+
+/** Sudut kedua sendi lengan. */
+export interface ArmAngles {
+  theta1: number;
+  theta2: number;
+}
+
+/** Posisi ujung lengan beserta titik sikunya. */
+export interface ForwardKinematics {
+  x: number;
+  y: number;
+  elbow_x: number;
+  elbow_y: number;
+}
+
+/** Sebuah rintangan berbentuk lingkaran. */
+export interface Obstacle {
+  x: number;
+  y: number;
+  radius: number;
+}
+
+/** Hasil perencanaan lintasan dengan medan potensial. */
+export interface PotentialPath {
+  points: [number, number][];
+  reached: boolean;
+  stuck_in_local_minimum: boolean;
+  length: number;
+}
+
+/** Mensimulasikan kendali PID pada sistem orde pertama. */
+export function roboticsPid(
+  kp: number,
+  ki: number,
+  kd: number,
+  outputLimit: number,
+  setpoint: number,
+  timeConstant: number,
+  steps: number,
+): ControlRun {
+  return unwrap<ControlRun>(
+    wasm.robotics_pid(kp, ki, kd, outputLimit, setpoint, timeConstant, steps),
+  );
+}
+
+/** Kinematika maju lengan dua sendi. */
+export function roboticsForward(
+  theta1: number,
+  theta2: number,
+  length1: number,
+  length2: number,
+): ForwardKinematics {
+  return unwrap<ForwardKinematics>(
+    wasm.robotics_forward(theta1, theta2, length1, length2),
+  );
+}
+
+/** Kinematika balik; mengembalikan kedua penyelesaiannya. */
+export function roboticsInverse(
+  x: number,
+  y: number,
+  length1: number,
+  length2: number,
+): ArmAngles[] {
+  return unwrap<ArmAngles[]>(wasm.robotics_inverse(x, y, length1, length2));
+}
+
+/** Merencanakan lintasan dengan medan potensial. */
+export function roboticsPath(
+  goalX: number,
+  goalY: number,
+  obstacles: Obstacle[],
+  repulsiveGain: number,
+  maxSteps: number,
+): PotentialPath {
+  return unwrap<PotentialPath>(
+    wasm.robotics_path(goalX, goalY, JSON.stringify(obstacles), repulsiveGain, maxSteps),
+  );
+}

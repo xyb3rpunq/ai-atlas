@@ -19,6 +19,8 @@
 //!
 //! | Sesi | Topik | Modul |
 //! |------|-------|-------|
+//! | 1 | Pengantar AI (ELIZA) | [`eliza`] |
+//! | 2 | Agen Cerdas & Ruang Keadaan | [`agent`] |
 //! | 3 | Ketidakpastian | [`certainty`] |
 //! | 4 | Probabilitas Bayesian | [`bayes`] |
 //! | 5-6 | Logika Fuzzy | [`fuzzy`] |
@@ -28,6 +30,7 @@
 //! | 11 | Sistem Pakar | [`expert`] |
 //! | 10 | Pemrosesan Bahasa Alami | [`nlp`] |
 //! | 12-13 | Sains Data & Machine Learning | [`ml`] |
+//! | 14 | Robotika | [`robotics`] |
 //! | — | Penunjang: keacakan deterministik | [`rng`] |
 //! | — | Penunjang: pertukaran pecahan bit-eksak | [`fx`] |
 
@@ -35,8 +38,10 @@
 #![warn(missing_docs)]
 #![warn(clippy::all)]
 
+pub mod agent;
 pub mod bayes;
 pub mod certainty;
+pub mod eliza;
 pub mod expert;
 pub mod fuzzy;
 pub mod fx;
@@ -45,6 +50,7 @@ pub mod ml;
 pub mod neural;
 pub mod nlp;
 pub mod rng;
+pub mod robotics;
 pub mod search;
 
 /// Versi pustaka, diambil dari `Cargo.toml` saat kompilasi.
@@ -65,6 +71,18 @@ pub struct SessionInfo {
 
 /// Daftar sesi yang sudah terimplementasi, terurut menaik.
 pub const SESSIONS: &[SessionInfo] = &[
+    SessionInfo {
+        session: 1,
+        module: "eliza",
+        title_id: "Pengantar Kecerdasan Buatan",
+        title_en: "Introduction to Artificial Intelligence",
+    },
+    SessionInfo {
+        session: 2,
+        module: "agent",
+        title_id: "Agen Kecerdasan, Masalah, dan Ruang Keadaan",
+        title_en: "Intelligent Agents, Problems, and State Space",
+    },
     SessionInfo {
         session: 3,
         module: "certainty",
@@ -130,6 +148,12 @@ pub const SESSIONS: &[SessionInfo] = &[
         module: "ml",
         title_id: "Machine Learning",
         title_en: "Machine Learning",
+    },
+    SessionInfo {
+        session: 14,
+        module: "robotics",
+        title_id: "Pengenalan Robotika",
+        title_en: "Introduction to Robotics",
     },
 ];
 

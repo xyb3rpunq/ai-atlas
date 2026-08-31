@@ -1321,6 +1321,180 @@ pub fn logic_semantic_network(node: &str) -> String {
     })
 }
 
+// ---------------------------------------------------------------------------
+// Sesi 1 — Pengantar Kecerdasan Buatan (ELIZA)
+// ---------------------------------------------------------------------------
+
+/// Balasan ELIZA beserta penjelasan bagaimana ia dihasilkan.
+#[wasm_bindgen]
+pub fn eliza_respond(input: &str, seed: u64) -> String {
+    let script = ai_core::eliza::indonesian_script();
+    match ai_core::eliza::respond(&script, input, seed) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+/// Ringkasan naskah ELIZA, untuk membongkar cara kerjanya.
+#[wasm_bindgen]
+pub fn eliza_script_summary() -> String {
+    ok(ai_core::eliza::summarise(
+        &ai_core::eliza::indonesian_script(),
+    ))
+}
+
+/// Naskah lengkap, sehingga pengguna bisa membaca seluruh aturannya.
+#[wasm_bindgen]
+pub fn eliza_script() -> String {
+    ok(ai_core::eliza::indonesian_script())
+}
+
+// ---------------------------------------------------------------------------
+// Sesi 2 — Agen Cerdas dan Ruang Keadaan
+// ---------------------------------------------------------------------------
+
+/// Menjalankan seluruh jenis agen pada dunia yang sama untuk dibandingkan.
+///
+/// `dirty_json` berbentuk larik boolean, mis. `[true,false,true]`.
+#[wasm_bindgen]
+pub fn agent_compare(dirty_json: &str, position: usize, max_steps: usize) -> String {
+    let dirty: Vec<bool> = match serde_json::from_str(dirty_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let world = match ai_core::agent::VacuumWorld::new(dirty, position) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    ok(ai_core::agent::compare_agents(&world, max_steps))
+}
+
+/// Menjalankan satu jenis agen dan mengembalikan jejaknya.
+#[wasm_bindgen]
+pub fn agent_run(dirty_json: &str, position: usize, kind: &str, max_steps: usize) -> String {
+    use ai_core::agent::AgentKind;
+    let dirty: Vec<bool> = match serde_json::from_str(dirty_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let world = match ai_core::agent::VacuumWorld::new(dirty, position) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let kind = match kind.to_ascii_lowercase().as_str() {
+        "simple_reflex" => AgentKind::SimpleReflex,
+        "model_based" => AgentKind::ModelBased,
+        "goal_based" => AgentKind::GoalBased,
+        "utility_based" => AgentKind::UtilityBased,
+        other => return err(format!("jenis agen tidak dikenal: {other}")),
+    };
+    ok(ai_core::agent::run_agent(&world, kind, max_steps))
+}
+
+/// Menyelesaikan masalah teko air.
+#[wasm_bindgen]
+pub fn agent_water_jug(capacity_a: usize, capacity_b: usize, target: usize) -> String {
+    match ai_core::agent::solve_water_jug(capacity_a, capacity_b, target) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+/// Menyelesaikan masalah misionaris dan kanibal.
+#[wasm_bindgen]
+pub fn agent_missionaries(missionaries: usize, cannibals: usize, boat: usize) -> String {
+    match ai_core::agent::solve_missionaries(missionaries, cannibals, boat) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sesi 14 — Robotika
+// ---------------------------------------------------------------------------
+
+/// Mensimulasikan kendali PID pada sistem orde pertama.
+#[wasm_bindgen]
+pub fn robotics_pid(
+    kp: f64,
+    ki: f64,
+    kd: f64,
+    output_limit: f64,
+    setpoint: f64,
+    time_constant: f64,
+    steps: usize,
+) -> String {
+    let mut pid = match ai_core::robotics::Pid::new(kp, ki, kd, output_limit) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    match ai_core::robotics::simulate_pid(&mut pid, setpoint, 0.0, time_constant, 0.05, steps) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+/// Kinematika maju lengan dua sendi.
+#[wasm_bindgen]
+pub fn robotics_forward(theta1: f64, theta2: f64, length1: f64, length2: f64) -> String {
+    let angles = ai_core::robotics::ArmAngles { theta1, theta2 };
+    match ai_core::robotics::forward_kinematics(angles, length1, length2) {
+        Ok((x, y)) => {
+            #[derive(Serialize)]
+            struct Out {
+                x: f64,
+                y: f64,
+                /// Titik sendi siku, dipakai menggambar lengannya.
+                elbow_x: f64,
+                elbow_y: f64,
+            }
+            ok(Out {
+                x,
+                y,
+                elbow_x: length1 * theta1.cos(),
+                elbow_y: length1 * theta1.sin(),
+            })
+        }
+        Err(e) => err(e),
+    }
+}
+
+/// Kinematika balik lengan dua sendi; mengembalikan kedua penyelesaiannya.
+#[wasm_bindgen]
+pub fn robotics_inverse(x: f64, y: f64, length1: f64, length2: f64) -> String {
+    match ai_core::robotics::inverse_kinematics(x, y, length1, length2) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+/// Merencanakan lintasan dengan medan potensial.
+#[wasm_bindgen]
+pub fn robotics_path(
+    goal_x: f64,
+    goal_y: f64,
+    obstacles_json: &str,
+    repulsive_gain: f64,
+    max_steps: usize,
+) -> String {
+    let obstacles: Vec<ai_core::robotics::Obstacle> = match serde_json::from_str(obstacles_json) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    match ai_core::robotics::plan_potential_field(
+        (0.0, 0.0),
+        (goal_x, goal_y),
+        &obstacles,
+        1.0,
+        repulsive_gain,
+        0.15,
+        max_steps,
+    ) {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2008,5 +2182,104 @@ mod tests {
         // Simpul yang tidak ada jatuh ke simpul bawaan, bukan menjadi galat.
         let cadangan = logic_semantic_network("naga");
         assert!(cadangan.contains(r#""selected":"pinguin""#), "{cadangan}");
+    }
+
+    #[test]
+    fn eliza_lewat_jembatan() {
+        let out = eliza_respond("saya merasa sedih", 1);
+        assert!(!out.contains(r#""err""#), "{out}");
+        assert!(out.contains("matched_keyword"));
+        assert!(!out.contains("{}"), "penanda templat bocor: {out}");
+
+        let ringkas = eliza_script_summary();
+        assert!(ringkas.contains("keywords"), "{ringkas}");
+        assert!(eliza_script().contains("rules"));
+    }
+
+    #[test]
+    fn eliza_menolak_masukan_terlalu_panjang() {
+        let panjang = "a".repeat(2_000);
+        assert!(eliza_respond(&panjang, 1).contains("err"));
+    }
+
+    #[test]
+    fn eliza_masukan_kosong_tetap_dijawab() {
+        let out = eliza_respond("", 1);
+        assert!(!out.contains(r#""err""#), "{out}");
+        assert!(out.contains(r#""used_fallback":true"#));
+    }
+
+    #[test]
+    fn agen_lewat_jembatan() {
+        let out = agent_compare("[true,false,true]", 0, 100);
+        assert!(!out.contains(r#""err""#), "{out}");
+        for jenis in [
+            "simple_reflex",
+            "model_based",
+            "goal_based",
+            "utility_based",
+        ] {
+            assert!(out.contains(jenis), "{jenis} hilang dari perbandingan");
+            let satu = agent_run("[true,false]", 0, jenis, 50);
+            assert!(!satu.contains(r#""err""#), "{jenis}: {satu}");
+        }
+    }
+
+    #[test]
+    fn agen_menolak_masukan_salah() {
+        assert!(agent_compare("bukan", 0, 10).contains("err"));
+        assert!(agent_compare("[]", 0, 10).contains("err"));
+        assert!(agent_compare("[true]", 9, 10).contains("err"));
+        assert!(agent_run("[true]", 0, "entah", 10).contains("err"));
+    }
+
+    #[test]
+    fn teko_air_lewat_jembatan() {
+        let out = agent_water_jug(3, 5, 4);
+        assert!(!out.contains(r#""err""#), "{out}");
+        assert!(out.contains("action"));
+        // Sasaran mustahil dilaporkan sebagai galat, bukan daftar kosong.
+        assert!(agent_water_jug(2, 4, 3).contains("err"));
+        assert!(agent_water_jug(0, 5, 3).contains("err"));
+    }
+
+    #[test]
+    fn misionaris_lewat_jembatan() {
+        let out = agent_missionaries(3, 3, 2);
+        assert!(!out.contains(r#""err""#), "{out}");
+        assert!(agent_missionaries(4, 4, 2).contains("err"));
+        assert!(agent_missionaries(0, 3, 2).contains("err"));
+    }
+
+    #[test]
+    fn pid_lewat_jembatan() {
+        let out = robotics_pid(1.2, 0.4, 0.2, 20.0, 10.0, 2.0, 200);
+        assert!(!out.contains(r#""err""#), "{out}");
+        assert!(out.contains("overshoot_percent"));
+        assert!(out.contains("settling_time"));
+        assert!(robotics_pid(f64::NAN, 0.0, 0.0, 1.0, 1.0, 1.0, 10).contains("err"));
+        assert!(robotics_pid(1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 10).contains("err"));
+    }
+
+    #[test]
+    fn kinematika_lewat_jembatan() {
+        let maju = robotics_forward(0.0, 0.0, 2.0, 1.0);
+        assert!(maju.contains(r#""x":3"#), "{maju}");
+        assert!(maju.contains("elbow_x"));
+
+        let balik = robotics_inverse(2.0, 1.0, 2.0, 1.5);
+        assert!(!balik.contains(r#""err""#), "{balik}");
+        assert!(robotics_inverse(100.0, 0.0, 2.0, 1.0).contains("err"));
+        assert!(robotics_forward(0.0, 0.0, 0.0, 1.0).contains("err"));
+    }
+
+    #[test]
+    fn lintasan_lewat_jembatan() {
+        let out = robotics_path(8.0, 0.0, "[]", 1.0, 300);
+        assert!(out.contains(r#""reached":true"#), "{out}");
+
+        let dengan_rintangan = robotics_path(8.0, 0.0, r#"[{"x":4,"y":0.3,"radius":2}]"#, 2.0, 400);
+        assert!(!dengan_rintangan.contains(r#""err""#), "{dengan_rintangan}");
+        assert!(robotics_path(8.0, 0.0, "bukan", 1.0, 100).contains("err"));
     }
 }
