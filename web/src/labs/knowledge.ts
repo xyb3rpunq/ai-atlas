@@ -14,10 +14,45 @@
  */
 
 import * as engine from "../engine.js";
+import { nama } from "../aturan.js";
+import type { KamusNama } from "../aturan.js";
 import { T, bi, pick } from "../i18n.js";
 import { buttonRow, card, clear, el, errorNote, table } from "../ui.js";
 import { figure, heatmap, nodeGraph } from "../viz.js";
 import type { GraphEdge, GraphNode } from "../viz.js";
+
+/**
+ * Nama simpul dan relasi yang dibaca manusia.
+ *
+ * Terpisah dari jaringannya karena di dalam mesin nama-nama itu **kunci**:
+ * relasi "adalah" yang menghubungkan "pinguin" ke "burung" adalah kunci yang
+ * sama yang dipakai penelusuran pewarisan. Menerjemahkannya di sana akan
+ * memutus pewarisannya — "penguin is-a bird" tidak akan pernah mewarisi sifat
+ * yang tertulis pada "burung".
+ */
+const NAMA: KamusNama = {
+  adalah: bi("adalah", "is-a"),
+  punya: bi("punya", "has"),
+  bisa: bi("bisa", "can"),
+  burung: bi("burung", "bird"),
+  pinguin: bi("pinguin", "penguin"),
+  hewan: bi("hewan", "animal"),
+  sayap: bi("sayap", "wings"),
+  terbang: bi("terbang", "fly"),
+  berenang: bi("berenang", "swim"),
+  sel: bi("sel", "cells"),
+};
+
+/**
+ * Nama relasi yang mewarisi sifat, di dalam mesin.
+ *
+ * Sebuah **kunci**, bukan teks yang ditampilkan: ia yang menghubungkan premis
+ * satu simpul dengan kesimpulan simpul lain. Namanya yang dibaca manusia ada
+ * di {@link NAMA}. Ditulis sekali di sini alih-alih diulang tiga kali sebagai
+ * untai lepas, supaya salah ketik menjadi galat dan bukan pewarisan yang
+ * diam-diam berhenti bekerja.
+ */
+const KUNCI_PEWARISAN = "adalah";
 
 /** Batas kedalaman pewarisan yang digambar. */
 const MAX_LAPIS = 5;
@@ -36,7 +71,7 @@ function grafSemantik(view: engine.SemanticNetworkView): {
 } {
   const naik = new Map<string, string[]>();
   for (const r of view.relations) {
-    if (r.label !== "adalah") continue;
+    if (r.label !== KUNCI_PEWARISAN) continue;
     const daftar = naik.get(r.from) ?? [];
     daftar.push(r.to);
     naik.set(r.from, daftar);
@@ -52,7 +87,7 @@ function grafSemantik(view: engine.SemanticNetworkView): {
 
   const terpakai = new Set<string>([view.selected, ...view.ancestors]);
   for (const r of view.relations) {
-    if (r.label === "adalah" && (r.to === view.selected || r.from === view.selected)) {
+    if (r.label === KUNCI_PEWARISAN && (r.to === view.selected || r.from === view.selected)) {
       terpakai.add(r.from);
       terpakai.add(r.to);
     }
@@ -64,18 +99,18 @@ function grafSemantik(view: engine.SemanticNetworkView): {
   const tinggiMaks = Math.max(...[...terpakai].map((n) => tinggi(n, MAX_LAPIS)), 0);
   const nodes: GraphNode[] = [...terpakai].sort().map((n) => ({
     id: n,
-    label: n,
+    label: nama(NAMA, n),
     layer: tinggiMaks - tinggi(n, MAX_LAPIS),
     tone:
       n === view.selected ? "tujuan" : view.ancestors.includes(n) ? "aktif" : "netral",
   }));
 
   const edges: GraphEdge[] = view.relations
-    .filter((r) => r.label === "adalah" && terpakai.has(r.from) && terpakai.has(r.to))
+    .filter((r) => r.label === KUNCI_PEWARISAN && terpakai.has(r.from) && terpakai.has(r.to))
     .map((r) => ({
       from: r.to,
       to: r.from,
-      label: r.label,
+      label: nama(NAMA, r.label),
       active: r.from === view.selected || view.ancestors.includes(r.from),
     }));
 
@@ -466,7 +501,11 @@ export function mount(root: HTMLElement): () => void {
               pick(bi("Relasi", "Relation")),
               pick(bi("Tujuan", "To")),
             ],
-            view.relations.map((r) => [r.from, r.label, r.to]),
+            view.relations.map((r) => [
+              nama(NAMA, r.from),
+              nama(NAMA, r.label),
+              nama(NAMA, r.to),
+            ]),
           ),
         ),
       );

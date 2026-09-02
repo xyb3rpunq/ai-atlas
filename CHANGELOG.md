@@ -7,6 +7,15 @@ penomoran mengikuti [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Belum dirilis]
 
+### Yang belum tertutup
+- **59 pesan galat di sisi Rust masih berbahasa Indonesia.** Semuanya pesan
+  penolakan masukan — rentang yang salah, larik yang tak sepadan, pembagian
+  dengan nol — dan seluruhnya sampai ke pengguna lewat `errorNote`. Antarmukanya
+  sudah menjaga sebagian besar jalan menuju ke sana (penggeser dibatasi,
+  masukan diperiksa), tetapi tidak seluruhnya. Menutupnya menuntut galatnya
+  membawa jenis dan parameter alih-alih kalimat jadi — persis perlakuan yang
+  baru diterapkan pada kalimat aturan — dan itu pekerjaan tersendiri.
+
 ### Diubah
 - **Kalimat aturan tidak lagi dirakit di mesinnya.** `RuleTrace` kabur dan
   `Step` pakar dulu mengembalikan kalimat jadi berbahasa Indonesia — "JIKA
@@ -27,6 +36,22 @@ penomoran mengikuti [Semantic Versioning](https://semver.org/lang/id/).
   keduanya kini dirakit di TypeScript — satu perjalanan bolak-balik lebih
   sedikit, dan dua bahasa alih-alih satu.
 
+### Diubah
+- 42 nama rumus dan 81 istilah di catatan laboratorium menjadi dwibahasa.
+  Seluruhnya sebelumnya hanya berbahasa Indonesia, di halaman yang setiap
+  bagian lainnya sudah berganti bahasa.
+- Sebelas ekspresi rumus ditulis ulang sebagai lambang yang sama di kedua
+  bahasa — `∧`, `∨`, `⟺`, `[syarat]` — alih-alih "dan", "atau", "bila".
+  Sebuah substitusi angka bukan kalimat, dan lambang yang berubah bentuk
+  antarbahasa memutus hubungannya dengan gambar di sebelahnya.
+- Nama simpul dan relasi jaringan semantik lewat kamus saat ditampilkan
+  (`adalah` → `is-a`, `burung` → `bird`), sementara kuncinya tetap. Kunci
+  pewarisannya sekarang tetapan bernama, bukan untai lepas yang diulang tiga
+  kali.
+- Judul tab dan tautan lompat ikut berganti bahasa. Keduanya diterapkan di
+  fungsi yang sama dengan atribut `lang`, supaya tidak ada jalan mengganti
+  bahasa yang melewatinya.
+
 ### Ditambahkan
 - **Naskah ELIZA berbahasa Inggris**, mengikuti DOCTOR asli Weizenbaum: sebelas
   aturan dengan keutamaan yang sepadan dengan naskah Indonesia, tabel penukaran
@@ -41,6 +66,15 @@ penomoran mengikuti [Semantic Versioning](https://semver.org/lang/id/).
   atribut yang dibaca manusia. Mesin WebAssembly-nya benar-benar dijalankan,
   karena sebagian besar teks laboratorium baru muncul sesudah ada hasil, dan
   halaman yang hampir kosong lolos setiap pemeriksaan bocoran.
+- **Uji yang membaca kode antarmukanya sendiri** dan menolak untai berbahasa
+  Indonesia yang tidak menjadi argumen pertama sebuah `bi(...)`. Ia menutup
+  celah yang tidak bisa dilihat uji lain: `render.test.ts` memasang tiap
+  laboratorium ke wadah lepas, sehingga kerangka aplikasi, catatan, kepala, dan
+  kaki halaman tidak pernah ikut terbaca. Bocoran terbesarnya ada persis di
+  sana.
+- Dua kesepakatan penamaan yang membuat pengecualiannya terbaca dari kodenya:
+  `KORPUS_*` untuk bahan yang memang berbahasa Indonesia dengan sengaja, dan
+  `KUNCI_*` untuk untai yang merupakan kunci mesin dan bukan teks.
 - Penandaan `data-korpus` untuk bahan yang memang berbahasa Indonesia dengan
   sengaja — kalimat contoh di laboratorium pengolahan bahasa, yang morfologi
   Indonesianya justru sedang dibedah. Ditandai di tempatnya, bukan dikecualikan

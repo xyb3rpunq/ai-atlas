@@ -14,6 +14,7 @@
 
 import init, * as wasm from "../pkg/ai_wasm.js";
 import wasmUrl from "../pkg/ai_wasm_bg.wasm?url";
+import { bi, pick } from "./i18n.js";
 import type { Lang } from "./i18n.js";
 
 /** Amplop hasil dari sisi Rust. */
@@ -46,7 +47,13 @@ function unwrap<T>(raw: string): T {
   try {
     parsed = JSON.parse(raw) as Envelope<T>;
   } catch {
-    throw new EngineError(`mesin mengembalikan JSON tidak sah: ${raw.slice(0, 120)}`);
+    // Dwibahasa seperti teks lain, meski jarang terlihat: kalau ia muncul,
+    // yang membacanya sedang mengalami kegagalan — dan pesan kegagalan dalam
+    // bahasa asing adalah yang paling buruk untuk dibaca.
+    throw new EngineError(
+      `${pick(bi("mesin mengembalikan JSON tidak sah", "the engine returned invalid JSON"))}: ` +
+        raw.slice(0, 120),
+    );
   }
   if ("err" in parsed) throw new EngineError(parsed.err);
   return parsed.ok;

@@ -28,8 +28,31 @@ export function restoreLang(): Lang {
   } catch {
     /* Penyimpanan bisa diblokir; bahasa bawaan tetap dipakai. */
   }
-  document.documentElement.lang = current;
+  applyHead(current);
   return current;
+}
+
+/**
+ * Menerapkan bahasa pada kepala dokumen.
+ *
+ * `lang` bukan hiasan: ia menentukan suara pembaca layar, pemenggalan kata,
+ * dan tanda kutip yang dipilih peramban. Judul tab ikut di sini karena ia
+ * satu-satunya teks yang tidak terlihat di halaman — sehingga ia juga
+ * satu-satunya yang bisa tertinggal berbulan-bulan tanpa ada yang
+ * menyadarinya, padahal ia yang menjadi nama penanda buku dan judul jendela.
+ *
+ * Keduanya diterapkan di satu tempat supaya tidak ada jalan mengganti bahasa
+ * yang melewati salah satunya.
+ */
+function applyHead(l: Lang): void {
+  document.documentElement.lang = l;
+  document.title = T.pageTitle[l];
+  // Tautan lompat ada di HTML, bukan dibangun skrip: ia harus sudah bisa
+  // ditekan sebelum satu baris skrip pun berjalan, karena justru pengguna
+  // papan ketik yang paling membutuhkannya. Yang diganti di sini hanya
+  // teksnya.
+  const lompat = document.getElementById("skip");
+  if (lompat !== null) lompat.textContent = T.skipToLab[l];
 }
 
 /** Bahasa aktif saat ini. */
@@ -41,7 +64,7 @@ export function lang(): Lang {
 export function setLang(next: Lang): void {
   if (next === current) return;
   current = next;
-  document.documentElement.lang = next;
+  applyHead(next);
   try {
     localStorage.setItem(KEY, next);
   } catch {
@@ -68,6 +91,13 @@ export function bi(id: string, en: string): Bilingual {
 
 /** Kamus teks antarmuka. */
 export const T = {
+  // Judul tab peramban, dan judul yang dibaca pembaca layar saat tab
+  // berpindah. Diterapkan di `applyHead`, bersama atribut `lang`.
+  pageTitle: bi(
+    "AI ATLAS — Laboratorium Kecerdasan Buatan Klasik",
+    "AI ATLAS — A Laboratory of Classical Artificial Intelligence",
+  ),
+  skipToLab: bi("Lompat ke laboratorium", "Skip to the laboratory"),
   tagline: bi(
     "Laboratorium Kecerdasan Buatan Klasik",
     "A Laboratory of Classical Artificial Intelligence",

@@ -12,7 +12,7 @@
 
 import * as engine from "../engine.js";
 import { bi, lang, pick } from "../i18n.js";
-import type { Lang } from "../i18n.js";
+import type { Bilingual } from "../i18n.js";
 import { buttonRow, card, clear, el, errorNote, table } from "../ui.js";
 import { figure, pipeline, rankedBars } from "../viz.js";
 
@@ -34,26 +34,15 @@ interface Turn {
  * bahasa: ia yang memperlihatkan balasan cadangan, dan tanpa contoh seperti
  * itu batas kemampuan ELIZA tidak pernah terlihat.
  */
-const SUGGESTIONS: Record<Lang, string[]> = {
-  id: [
-    "Halo",
-    "Saya merasa lelah akhir-akhir ini",
-    "Saya ingin pindah kerja",
-    "Ibu saya sering mengkhawatirkan saya",
-    "Saya tidak bisa tidur nyenyak",
-    "Kenapa semuanya terasa berat",
-    "Cuaca hari ini cerah sekali",
-  ],
-  en: [
-    "Hello",
-    "I feel tired lately",
-    "I want to change jobs",
-    "My mother worries about me a lot",
-    "I can't sleep well",
-    "Why does everything feel heavy",
-    "The weather is lovely today",
-  ],
-};
+const SUGGESTIONS: Bilingual[] = [
+  bi("Halo", "Hello"),
+  bi("Saya merasa lelah akhir-akhir ini", "I feel tired lately"),
+  bi("Saya ingin pindah kerja", "I want to change jobs"),
+  bi("Ibu saya sering mengkhawatirkan saya", "My mother worries about me a lot"),
+  bi("Saya tidak bisa tidur nyenyak", "I can't sleep well"),
+  bi("Kenapa semuanya terasa berat", "Why does everything feel heavy"),
+  bi("Cuaca hari ini cerah sekali", "The weather is lovely today"),
+];
 
 /**
  * Memasang laboratorium ke dalam elemen yang diberikan.
@@ -337,9 +326,9 @@ export function mount(root: HTMLElement): () => void {
         card(
           pick(bi("Coba kalimat ini", "Try these")),
           buttonRow(
-            SUGGESTIONS[bahasa].map((s) => ({
-              label: s,
-              onClick: () => send(s),
+            SUGGESTIONS.map((s) => ({
+              label: pick(s),
+              onClick: () => send(pick(s)),
             })),
           ),
           el("p", {

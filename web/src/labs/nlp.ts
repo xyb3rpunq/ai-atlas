@@ -37,16 +37,16 @@ type Tab = "pipeline" | "stem" | "tfidf" | "similarity";
  * dan bagian lain mana pun tetap dituntut diterjemahkan.
  */
 
-const SAMPLE_TEXT =
+const KORPUS_TEKS =
   "Saya suka membaca buku di perpustakaan kampus. Pelayanannya bagus dan petugasnya ramah. Sayangnya bukunya tidak lengkap.";
 
-const SAMPLE_DOCS = [
+const KORPUS_DOKUMEN = [
   "Kucing itu suka makan ikan segar",
   "Kucing kesayangan saya gemar makan ikan",
   "Mobil balap melaju sangat cepat di lintasan",
 ];
 
-const SAMPLE_WORDS = [
+const KORPUS_KATA = [
   "menyapu",
   "beruang",
   "membacakan",
@@ -66,10 +66,10 @@ const SAMPLE_WORDS = [
  */
 export function mount(root: HTMLElement): () => void {
     let tab: Tab = "pipeline";
-    let text = SAMPLE_TEXT;
+    let text = KORPUS_TEKS;
     let removeStopwords = true;
     let stem = true;
-    let docs = [...SAMPLE_DOCS];
+    let docs = [...KORPUS_DOKUMEN];
     let wordA = "kucing";
     let wordB = "kucin";
     let ngramSize = 2;
@@ -149,7 +149,7 @@ export function mount(root: HTMLElement): () => void {
             summary: bi(
               "Batang yang memendek tajam adalah tahap yang paling banyak membuang. " +
                 "Tahap seperti itu paling berkuasa sekaligus paling berbahaya: satu kata henti " +
-                'yang salah masuk daftar — misalnya "tidak" — sudah cukup untuk membalik makna ' +
+                'yang salah masuk daftar — misalnya “tidak” — sudah cukup untuk membalik makna ' +
                 "seluruh kalimat tanpa satu pun galat muncul.",
               "A bar that drops sharply marks the stage that discards the most. Such stages are " +
                 'the most powerful and the most dangerous: one wrong entry in the stopword list — ' +
@@ -339,8 +339,8 @@ export function mount(root: HTMLElement): () => void {
       // Dua kata yang paling menjelaskan algoritmanya digambar alurnya; sisanya
       // cukup ditabelkan. Menggambar keempat belasnya justru mengubur bagian
       // yang ingin ditunjukkan.
-      const sorot = ["menyapu", "beruang"].filter((w) => SAMPLE_WORDS.includes(w));
-      const alur = sorot.length > 0 ? sorot : SAMPLE_WORDS.slice(0, 2);
+      const sorot = ["menyapu", "beruang"].filter((w) => KORPUS_KATA.includes(w));
+      const alur = sorot.length > 0 ? sorot : KORPUS_KATA.slice(0, 2);
       for (const word of alur) {
         try {
           const r = engine.nlpStem(word);
@@ -373,7 +373,7 @@ export function mount(root: HTMLElement): () => void {
       }
 
       const rows: (string | number)[][] = [];
-      for (const word of SAMPLE_WORDS) {
+      for (const word of KORPUS_KATA) {
         try {
           const r = engine.nlpStem(word);
           rows.push([
@@ -758,7 +758,7 @@ export function mount(root: HTMLElement): () => void {
               {
                 label: pick(bi("Contoh awal", "Sample corpus")),
                 onClick: () => {
-                  docs = [...SAMPLE_DOCS];
+                  docs = [...KORPUS_DOKUMEN];
                   renderControls();
                   render();
                 },

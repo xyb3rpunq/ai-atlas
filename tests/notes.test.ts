@@ -65,7 +65,8 @@ describe("kelengkapan catatan", () => {
     const notes = notesFor(slug);
     if (!notes) return;
     for (const d of notes.definitions) {
-      expect(d.term.trim().length).toBeGreaterThan(0);
+      expect(d.term.id.trim().length).toBeGreaterThan(0);
+      expect(d.term.en.trim().length).toBeGreaterThan(0);
       // Definisi sepanjang beberapa kata biasanya hanya parafrase istilahnya
       // sendiri, yang tidak menjelaskan apa pun.
       expect(d.meaning.id.length).toBeGreaterThan(40);
@@ -77,7 +78,8 @@ describe("kelengkapan catatan", () => {
     const notes = notesFor(slug);
     if (!notes) return;
     for (const f of notes.formulas) {
-      expect(f.name.trim().length).toBeGreaterThan(0);
+      expect(f.name.id.trim().length).toBeGreaterThan(0);
+      expect(f.name.en.trim().length).toBeGreaterThan(0);
       expect(f.expression.trim().length).toBeGreaterThan(0);
       // Rumus tanpa keterangan kapan ia berlaku adalah jebakan.
       expect(f.note.id.length).toBeGreaterThan(30);
@@ -88,8 +90,13 @@ describe("kelengkapan catatan", () => {
   it.each(SLUG_LAB)("istilah %s tidak terduplikasi", (slug) => {
     const notes = notesFor(slug);
     if (!notes) return;
-    const istilah = notes.definitions.map((d) => d.term.toLowerCase());
-    expect(new Set(istilah).size).toBe(istilah.length);
+    // Diperiksa per bahasa. Dua istilah yang berbeda dalam Bahasa Indonesia
+    // tetapi jatuh pada kata Inggris yang sama menghasilkan daftar dengan dua
+    // baris identik bagi yang membacanya dalam Bahasa Inggris.
+    for (const b of ["id", "en"] as const) {
+      const istilah = notes.definitions.map((d) => d.term[b].toLowerCase());
+      expect(new Set(istilah).size, b).toBe(istilah.length);
+    }
   });
 
   it("rujukan berpranala memakai alamat yang sah", () => {
@@ -118,8 +125,11 @@ describe("kelengkapan catatan", () => {
     const bolehSama = new Set(["TF-IDF", "Naive Bayes", "PEAS", "Perceptron", "Epoch"]);
     for (const [slug, notes] of Object.entries(NOTES)) {
       for (const d of notes.definitions) {
-        if (bolehSama.has(d.term)) continue;
-        expect(d.meaning.id, `${slug}: ${d.term}`).not.toBe(d.meaning.en);
+        if (bolehSama.has(d.term.id)) continue;
+        expect(d.meaning.id, `${slug}: ${d.term.id}`).not.toBe(d.meaning.en);
+      }
+      for (const f of notes.formulas) {
+        expect(f.note.id, `${slug}: ${f.name.id}`).not.toBe(f.note.en);
       }
       expect(notes.summary.id, slug).not.toBe(notes.summary.en);
     }

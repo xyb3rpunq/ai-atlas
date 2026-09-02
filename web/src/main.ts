@@ -260,7 +260,7 @@ function notesSection(slug: string): HTMLElement | null {
       el("dl", {
         class: "defs",
         children: notes.definitions.flatMap((d) => [
-          el("dt", { text: d.term }),
+          el("dt", { text: pick(d.term) }),
           el("dd", { text: pick(d.meaning) }),
         ]),
       }),
@@ -276,7 +276,7 @@ function notesSection(slug: string): HTMLElement | null {
           el("div", {
             class: "formula",
             children: [
-              el("div", { class: "formula__name", text: f.name }),
+              el("div", { class: "formula__name", text: pick(f.name) }),
               el("pre", { class: "formula__body", text: f.expression }),
               el("p", { class: "formula__note", text: pick(f.note) }),
             ],
