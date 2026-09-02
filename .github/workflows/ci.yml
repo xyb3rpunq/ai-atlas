@@ -220,6 +220,22 @@ jobs:
         working-directory: tools/conform
         run: go run .
 
+      # Pola bit yang dihitung Go dipancarkan sebagai artefak, bukan dikomit.
+      # Go tidak terpasang di mesin tempat halaman ini disusun, jadi angkanya
+      # harus datang dari tempat Go benar-benar berjalan. Mengarangnya di
+      # tempat lain akan menghasilkan tabel yang terlihat seperti bukti padahal
+      # tidak ada yang pernah menghitungnya.
+      - name: Pancarkan pola bit Go
+        working-directory: tools/conform
+        run: go run . --pancar > "$RUNNER_TEMP/go.tsv"
+
+      - name: Unggah pola bit Go
+        uses: actions/upload-artifact@v4
+        with:
+          name: pola-bit-go
+          path: ${{ runner.temp }}/go.tsv
+          retention-days: 30
+
   oracle:
     name: Oracle — skema, PL/SQL, konformansi tiga arah
     runs-on: ubuntu-latest
@@ -287,6 +303,15 @@ jobs:
         env:
           AI_ATLAS_ORACLE_MODE: langsung
         run: bash oracle/run.sh
+
+      # PL/SQL tidak bisa dijalankan di mesin tempat halaman ini disusun, jadi
+      # pola bitnya harus datang dari tempat basis datanya benar-benar ada.
+      - name: Unggah pola bit PL/SQL
+        uses: actions/upload-artifact@v4
+        with:
+          name: pola-bit-plsql
+          path: oracle/generated/plsql.tsv
+          retention-days: 30
 
   deploy:
     name: Terbitkan ke GitHub Pages

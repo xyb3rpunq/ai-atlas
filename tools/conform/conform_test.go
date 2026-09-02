@@ -12,6 +12,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -309,5 +310,151 @@ func TestTingkatTakDikenalDitolak(t *testing.T) {
 	}
 	if _, err := BacaKeterbandingan("Kira-kira sama"); err == nil {
 		t.Error("tingkat karangan seharusnya ditolak")
+	}
+}
+
+// TestPancarMemakaiPerhitunganYangSama membuktikan pemancar dan pemeriksa
+// berangkat dari satu sumber.
+//
+// Kalau keduanya punya jalur perhitungan terpisah, halaman "Enam bahasa, satu
+// angka" bisa menampilkan pola bit yang tidak pernah diperiksa siapa pun —
+// tabel yang terlihat seperti bukti padahal tidak dibandingkan dengan apa pun.
+func TestPancarMemakaiPerhitunganYangSama(t *testing.T) {
+	dir := t.TempDir()
+	benar := aicore.GabungParalel(0.8, 0.6)
+	isi := strings.Join([]string{
+		"# keterbandingan: BitExact",
+		"# kolom: op\ta_hex\tb_hex\tresult_hex",
+		strings.Join([]string{"parallel", aicore.KeHex(0.8), aicore.KeHex(0.6), aicore.KeHex(benar)}, "\t"),
+		"",
+	}, "\n")
+	path := filepath.Join(dir, "certainty.tsv")
+	if err := os.WriteFile(path, []byte(isi), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	berkas, err := MuatBerkas(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type baris struct {
+		baris   int
+		kolom   string
+		hex     string
+		konteks string
+	}
+	var keluar []baris
+	if err := PancarkanBerkas(berkas, func(n int, kolom, hex, konteks string) {
+		keluar = append(keluar, baris{n, kolom, hex, konteks})
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(keluar) != 1 {
+		t.Fatalf("seharusnya memancarkan 1 nilai, memancarkan %d", len(keluar))
+	}
+	if keluar[0].baris != 1 {
+		t.Errorf("nomor barisnya seharusnya 1, dilaporkan %d", keluar[0].baris)
+	}
+	if keluar[0].kolom != "result_hex" {
+		t.Errorf("kolomnya seharusnya result_hex, dilaporkan %q", keluar[0].kolom)
+	}
+	// Inilah ikatannya: yang dipancarkan harus pola bit yang sama dengan yang
+	// dinyatakan lolos oleh pemeriksa.
+	if keluar[0].hex != aicore.KeHex(benar) {
+		t.Errorf("pola bitnya %q, seharusnya %q", keluar[0].hex, aicore.KeHex(benar))
+	}
+}
+
+// TestPancarMenghitungTiapBesaran menjaga kuncinya tetap lengkap.
+//
+// Satu baris `bayes.tsv` menghasilkan tiga besaran dan satu baris `rng.tsv`
+// dua. Memancarkan satu per baris membuat kolom bahasa lain kosong tanpa
+// alasan, dan kosong yang tidak dijelaskan terbaca sebagai perbedaan.
+func TestPancarMenghitungTiapBesaran(t *testing.T) {
+	for _, kasus := range []struct {
+		nama    string
+		isi     []string
+		harapan int
+		kolom   []string
+	}{
+		{
+			nama: "bayes.tsv",
+			isi: []string{
+				"# keterbandingan: BitExact",
+				"# kolom: prior_hex\tlikelihood_h_hex\tlikelihood_not_h_hex\tevidence_hex\tposterior_hex\tlikelihood_ratio_hex",
+			},
+			harapan: 3,
+			kolom:   []string{"evidence_hex", "posterior_hex", "likelihood_ratio_hex"},
+		},
+		{
+			nama: "rng.tsv",
+			isi: []string{
+				"# keterbandingan: BitExact",
+				"# kolom: seed\tindex\tnext_u64_hex\tnext_f64_hex",
+			},
+			harapan: 2,
+			kolom:   []string{"next_u64_hex", "next_f64_hex"},
+		},
+	} {
+		t.Run(kasus.nama, func(t *testing.T) {
+			dir := t.TempDir()
+			isi := kasus.isi
+			switch kasus.nama {
+			case "bayes.tsv":
+				h := aicore.BayesBiner(0.2, 0.9, 0.3)
+				isi = append(isi, strings.Join([]string{
+					aicore.KeHex(0.2), aicore.KeHex(0.9), aicore.KeHex(0.3),
+					aicore.KeHex(h.Bukti), aicore.KeHex(h.Posterior),
+					aicore.KeHex(h.RasioKemungkinan),
+				}, "\t"))
+			case "rng.tsv":
+				r := aicore.BaruSplitMix64(0)
+				u := r.NextU64()
+				rf := aicore.BaruSplitMix64(0)
+				f := rf.NextF64()
+				isi = append(isi, strings.Join([]string{
+					"0", "0", strconv.FormatUint(u, 16), aicore.KeHex(f),
+				}, "\t"))
+			}
+			isi = append(isi, "")
+
+			path := filepath.Join(dir, kasus.nama)
+			if err := os.WriteFile(path, []byte(strings.Join(isi, "\n")), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			berkas, err := MuatBerkas(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var kolom []string
+			if err := PancarkanBerkas(berkas, func(_ int, k, _, _ string) {
+				kolom = append(kolom, k)
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if len(kolom) != kasus.harapan {
+				t.Fatalf("seharusnya %d besaran, dipancarkan %d", kasus.harapan, len(kolom))
+			}
+			for i, k := range kasus.kolom {
+				if kolom[i] != k {
+					t.Errorf("besaran ke-%d seharusnya %q, dipancarkan %q", i+1, k, kolom[i])
+				}
+			}
+
+			// Pemeriksanya harus melihat jumlah yang sama persis.
+			hasil, err := PeriksaBerkas(berkas)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if hasil.Diperiksa != kasus.harapan {
+				t.Errorf("pemeriksa menghitung %d, pemancar %d", hasil.Diperiksa, kasus.harapan)
+			}
+			if len(hasil.Gagal) != 0 {
+				t.Errorf("vektor yang dihasilkan sendiri seharusnya lolos, gagal %d", len(hasil.Gagal))
+			}
+		})
 	}
 }

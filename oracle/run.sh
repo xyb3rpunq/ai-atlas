@@ -29,7 +29,8 @@ AKAR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$AKAR"
 
 BERKAS=(01_schema.sql 02_pkg_ai_core.pks 03_pkg_ai_core.pkb
-        04_seed_knowledge.sql 05_conformance.sql 06_tests.sql deploy.sql)
+        04_seed_knowledge.sql 05_conformance.sql 06_tests.sql 07_pancar.sql
+        deploy.sql)
 
 echo "==> Menghasilkan pemuat vektor dari keluaran Rust"
 node oracle/tools/make-load-sql.mjs
@@ -56,13 +57,19 @@ SET FEEDBACK OFF
 @generated/load_vectors.sql
 EXEC pkg_ai_conform.jalankan_dan_laporkan;
 @06_tests.sql
+@07_pancar.sql
 EXIT
 SQL
 
 jalankan_sqlplus_langsung() {
-  cd oracle
-  sqlplus -s "$PENGGUNA/$SANDI@$LAYANAN" @generated/jalan.sql
-  sqlplus -s "$PENGGUNA/$SANDI@$LAYANAN" @generated/jalan2.sql
+  # Subkulit: tanpa ini `cd oracle` tetap berlaku sesudah fungsinya selesai,
+  # dan langkah berikutnya — yang memakai jalur nisbi dari akar repositori —
+  # akan mencari berkasnya satu tingkat terlalu dalam.
+  (
+    cd oracle
+    sqlplus -s "$PENGGUNA/$SANDI@$LAYANAN" @generated/jalan.sql
+    sqlplus -s "$PENGGUNA/$SANDI@$LAYANAN" @generated/jalan2.sql
+  )
 }
 
 jalankan_lewat_kontainer() {
@@ -101,12 +108,38 @@ jalankan_lewat_kontainer() {
     "cd /tmp/aiatlas && sqlplus -s $PENGGUNA/$SANDI@$LAYANAN @generated/jalan.sql"
   docker exec "$NAMA_KONTAINER" bash -lc \
     "cd /tmp/aiatlas && sqlplus -s $PENGGUNA/$SANDI@$LAYANAN @generated/jalan2.sql"
+
+  # Hasil spool-nya ada di dalam kontainer; dikeluarkan lewat stdout dengan
+  # alasan yang sama seperti pengiriman berkas masuk.
+  docker exec "$NAMA_KONTAINER" bash -lc \
+    "cat /tmp/aiatlas/generated/plsql-baris.tsv" > "oracle/generated/plsql-baris.tsv"
 }
 
 if [ "$MODE" = "langsung" ]; then
   jalankan_sqlplus_langsung
 else
   jalankan_lewat_kontainer
+fi
+
+# Kepala berkasnya ditulis di sini, bukan di SQL. Membaca versi basis data
+# menuntut hak akses ke v$version yang belum tentu dimiliki pengguna aplikasi,
+# dan sebuah SELECT yang gagal akan menghentikan seluruh jalan karena
+# `WHENEVER SQLERROR EXIT` sedang berlaku. Citra yang dipakai sudah diketahui
+# skrip ini.
+if [ -s "oracle/generated/plsql-baris.tsv" ]; then
+  {
+    echo "# ai-atlas — pola bit yang dihitung PL/SQL"
+    echo "# bahasa: plsql"
+    echo "# versi: $CITRA"
+    echo "# dihasilkan: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "# perintah: bash oracle/run.sh"
+    printf '# kolom: berkas\tbaris\tkolom\thasil_hex\tkonteks\n'
+    # Spasi di ujung dan baris kosong datang dari SQL*Plus, bukan dari datanya.
+    sed -e 's/[[:space:]]*$//' -e '/^$/d' "oracle/generated/plsql-baris.tsv"
+  } > "oracle/generated/plsql.tsv"
+  echo "==> Pola bit PL/SQL: $(( $(wc -l < oracle/generated/plsql.tsv) - 6 )) pernyataan"
+else
+  echo "==> PERINGATAN: pola bit PL/SQL tidak terbentuk."
 fi
 
 echo
