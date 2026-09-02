@@ -152,7 +152,7 @@ jobs:
         run: npm run budget
 
       - name: Simpan hasil build
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
