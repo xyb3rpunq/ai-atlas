@@ -15,6 +15,16 @@ import { notesFor } from "./labs/notes.js";
 import { LABEL as EKSPOR_LABEL, bacaIsi, csv, download, fileName, reportRows } from "./ekspor";
 import { clear, el } from "./ui.js";
 
+/**
+ * Alamat halaman lintas-bahasa.
+ *
+ * Ditulis di sini, bukan diimpor dari modulnya, supaya modul itu tidak ikut
+ * masuk bundel utama hanya karena navigasinya perlu tahu alamatnya. Halaman
+ * itu membawa data pola bit enam bahasa; pengunjung yang tidak membukanya
+ * tidak punya alasan mengunduhnya.
+ */
+const SLUG_ENAM_BAHASA = "enam-bahasa";
+
 const THEME_KEY = "ai-atlas:theme";
 const app = document.querySelector<HTMLElement>("#app");
 
@@ -131,6 +141,21 @@ function sidebar(active: string): HTMLElement {
         children: [
           el("div", { class: "nav__heading", text: pick(T.labs) }),
           ...items,
+          // Di bawah daftar silabus, dipisahkan judulnya sendiri: halaman ini
+          // bukan sesi kuliah, dan menaruhnya di antara nomor 01 sampai 14
+          // akan membuatnya terbaca seperti sesi yang nomornya hilang.
+          el("div", { class: "nav__heading", text: pick(T.lintasBahasa) }),
+          el("a", {
+            class: "nav__item",
+            attrs: {
+              href: `#/${SLUG_ENAM_BAHASA}`,
+              "aria-current": active === SLUG_ENAM_BAHASA ? "page" : null,
+            },
+            children: [
+              el("span", { class: "nav__num", text: "6×" }),
+              el("span", { text: pick(T.enamBahasa) }),
+            ],
+          }),
         ],
       }),
     ],
@@ -419,6 +444,40 @@ function exportSection(lab: Lab, body: HTMLElement): HTMLElement {
   });
 }
 
+/**
+ * Halaman lintas-bahasa, dimuat saat dibuka.
+ *
+ * Modulnya membawa pola bit enam implementasi. Memuatnya di muka berarti
+ * setiap pengunjung halaman depan mengunduh data yang hanya dibutuhkan satu
+ * halaman — persis alasan mesin tiap laboratorium juga dimuat belakangan.
+ */
+function halamanLintasBahasa(): HTMLElement {
+  const wadah = el("div", {
+    children: [el("p", { class: "note", text: pick(T.loading) })],
+  });
+
+  const tokenSaatIni = ++muatKe;
+  void import("./enam-bahasa.js")
+    .then((modul) => {
+      if (tokenSaatIni !== muatKe) return;
+      clear(wadah);
+      wadah.append(modul.halamanEnamBahasa());
+    })
+    .catch((error: unknown) => {
+      if (tokenSaatIni !== muatKe) return;
+      clear(wadah);
+      wadah.append(
+        el("p", {
+          class: "error",
+          attrs: { role: "alert" },
+          text: `${pick(T.loadFailed)}: ${(error as Error).message}`,
+        }),
+      );
+    });
+
+  return wadah;
+}
+
 /** Halaman untuk alamat yang tidak dikenal. */
 function notFoundPage(): HTMLElement {
   return el("div", {
@@ -476,7 +535,17 @@ function render(): void {
 
   const slug = currentSlug();
   const lab = slug ? findLab(slug) : undefined;
-  const content = slug === "" ? homePage() : lab ? labPage(lab) : notFoundPage();
+  // Halaman lintas-bahasa bukan laboratorium: ia tidak punya nomor sesi dan
+  // tidak menjalankan mesin apa pun. Karena itu ia dirutekan tersendiri alih-
+  // alih diselipkan ke katalog sebagai sesi nol.
+  const content =
+    slug === ""
+      ? homePage()
+      : slug === SLUG_ENAM_BAHASA
+        ? halamanLintasBahasa()
+        : lab
+          ? labPage(lab)
+          : notFoundPage();
 
   clear(app);
   app.removeAttribute("aria-busy");

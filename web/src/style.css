@@ -887,7 +887,7 @@ canvas {
 .ekspor {
   margin-top: 2rem;
   padding-top: 1.4rem;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border);
 }
 
 .ekspor__kabar {
@@ -897,7 +897,7 @@ canvas {
 
 .kabar {
   font-size: 0.84rem;
-  color: var(--ink-3);
+  color: var(--text-muted);
 }
 
 .kabar--ok {
@@ -912,6 +912,106 @@ canvas {
  * menentukan bentuk berkas PDF yang disimpan pengguna — bukan sekadar bentuk
  * kertas yang jarang dipakai siapa pun.
  */
+/* ------------------------------------------------------------- peta bit */
+/*
+ * Enam puluh empat kotak, satu per bit.
+ *
+ * Dibuat sebagai kotak dan bukan sebagai untai "0110…" karena yang sedang
+ * ditunjukkan adalah *letak* bit yang berbeda: bit mantisa paling kanan
+ * berarti satu ULP, bit di ujung kiri mantisa berarti selisih yang besar.
+ * Untai teks membuat keduanya terlihat sama persis.
+ */
+
+.peta-bit__baris {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.25rem 0;
+}
+
+.peta-bit__nama {
+  flex: 0 0 7.5rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.peta-bit {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 1px;
+  /* Bidangnya bisa digulir di layar sempit. Enam puluh empat kotak tidak muat
+     di telepon, dan mengecilkannya sampai muat membuat kotaknya lebih kecil
+     daripada yang bisa dilihat mata. */
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.bit {
+  flex: 0 0 auto;
+  width: 0.62rem;
+  height: 1.05rem;
+  display: grid;
+  place-items: center;
+  font-size: 0.5rem;
+  font-family: var(--font-mono);
+  color: transparent;
+  border-radius: 1px;
+  /* Warnanya menandai bagian, bukan nilainya: tanda, eksponen, mantisa. Bit
+     yang menyala dibedakan lewat kepekatan, sehingga keduanya bisa dibaca
+     sekaligus tanpa saling menutupi. */
+  background: var(--surface-2);
+}
+
+.bit--tanda {
+  background: color-mix(in srgb, var(--danger) 18%, var(--surface-2));
+}
+
+.bit--eksponen {
+  background: color-mix(in srgb, var(--warn) 18%, var(--surface-2));
+}
+
+.bit--mantisa {
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
+}
+
+.bit--nyala.bit--tanda {
+  background: var(--danger);
+}
+
+.bit--nyala.bit--eksponen {
+  background: var(--warn);
+}
+
+.bit--nyala.bit--mantisa {
+  background: var(--accent);
+}
+
+/* Bit yang berbeda dari acuannya diberi bingkai, bukan warna lain: warna
+   keempat akan bertabrakan dengan ketiga warna bagian yang sudah ada, dan
+   yang perlu terlihat justru bahwa bit itu tetap milik bagiannya. */
+.bit--beda {
+  outline: 2px solid var(--text);
+  outline-offset: -1px;
+  z-index: 1;
+}
+
+.sub {
+  font-size: 0.85rem;
+  margin: 1.1rem 0 0.4rem;
+  color: var(--text-muted);
+}
+
+@media (max-width: 640px) {
+  .peta-bit__baris {
+    display: block;
+  }
+
+  .peta-bit__nama {
+    display: block;
+    margin-bottom: 0.15rem;
+  }
+}
+
 @media print {
   /* Yang dibuang hanyalah kemudi. Yang tersisa adalah setelan, angka, dan
      tabelnya — persis yang dibawa mahasiswa ke ruang asistensi. */

@@ -30,8 +30,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/xyb3rpunq/ai-atlas/tools/conform/aicore"
 )
@@ -214,72 +216,96 @@ type Hasil struct {
 	Dilewati int
 }
 
-// pemeriksa menghitung ulang satu baris dan mengembalikan nilai yang diharapkan
-// beserta nilai hitungan Go. Mengembalikan false bila baris ini tidak ditangani.
-type pemeriksa func(baris []string) (harapan, diperoleh float64, konteks string, ditangani bool, err error)
+// Nilai adalah satu besaran yang dihitung ulang dari sebuah baris vektor.
+//
+// Satu baris bisa menghasilkan lebih dari satu: `bayes.tsv` menuliskan peluang
+// bukti, posterior, dan rasio kemungkinan sekaligus, dan `rng.tsv` menuliskan
+// bilangan bulat beserta pecahan yang diturunkan darinya.
+//
+// Mengembalikan seluruhnya membuat pemeriksa dan pemancar berbagi satu sumber
+// perhitungan. Dua daftar terpisah pasti menyimpang cepat atau lambat — dan
+// yang menyimpang adalah alat yang justru dibuat untuk membuktikan tidak ada
+// yang menyimpang.
+type Nilai struct {
+	// Kolom menyebut kolom hasil di berkas vektornya, apa adanya. Nama itu
+	// yang dipakai memasangkan hasil Go dengan hasil bahasa lain.
+	Kolom     string
+	Harapan   float64
+	Diperoleh float64
+	Konteks   string
+}
+
+// pemeriksa menghitung ulang satu baris dan mengembalikan seluruh besaran yang
+// dihasilkannya. Mengembalikan false bila baris ini tidak ditangani.
+type pemeriksa func(baris []string) (nilai []Nilai, ditangani bool, err error)
 
 func hexAtau(s string) (float64, error) {
 	return aicore.DariHex(s)
 }
 
 // periksaRng mencocokkan deret SplitMix64.
-func periksaRng(baris []string) (float64, float64, string, bool, error) {
+//
+// Bilangan bulatnya dibandingkan sebagai pola bit, sama seperti pecahannya.
+// Kegagalan pada bilangan bulat jauh lebih serius karena tidak ada pembulatan
+// yang terlibat sama sekali; jaraknya dalam ULP tidak punya arti di sana, dan
+// berkas ini memang bertingkat BitExact.
+func periksaRng(baris []string) ([]Nilai, bool, error) {
 	if len(baris) < 4 {
-		return 0, 0, "", false, fmt.Errorf("baris rng tidak lengkap")
+		return nil, false, fmt.Errorf("baris rng tidak lengkap")
 	}
 	seed, err := strconv.ParseUint(baris[0], 10, 64)
 	if err != nil {
-		return 0, 0, "", false, err
+		return nil, false, err
 	}
 	index, err := strconv.Atoi(baris[1])
 	if err != nil {
-		return 0, 0, "", false, err
+		return nil, false, err
+	}
+	harapanU, err := strconv.ParseUint(baris[2], 16, 64)
+	if err != nil {
+		return nil, false, err
+	}
+	harapanF, err := hexAtau(baris[3])
+	if err != nil {
+		return nil, false, err
 	}
 
-	// Bilangan bulatnya dibandingkan langsung; kegagalan di sini jauh lebih
-	// serius daripada selisih pecahan karena tidak ada pembulatan yang terlibat.
 	r := aicore.BaruSplitMix64(seed)
 	var u uint64
 	for i := 0; i <= index; i++ {
 		u = r.NextU64()
 	}
-	harapanU, err := strconv.ParseUint(baris[2], 16, 64)
-	if err != nil {
-		return 0, 0, "", false, err
-	}
-	if u != harapanU {
-		return math.Float64frombits(harapanU), math.Float64frombits(u),
-			fmt.Sprintf("next_u64 benih %d indeks %d", seed, index), true, nil
-	}
-
 	rf := aicore.BaruSplitMix64(seed)
 	var f float64
 	for i := 0; i <= index; i++ {
 		f = rf.NextF64()
 	}
-	harapan, err := hexAtau(baris[3])
-	if err != nil {
-		return 0, 0, "", false, err
-	}
-	return harapan, f, fmt.Sprintf("next_f64 benih %d indeks %d", seed, index), true, nil
+
+	konteks := fmt.Sprintf("benih %d indeks %d", seed, index)
+	hu := math.Float64frombits(harapanU)
+	du := math.Float64frombits(u)
+	return []Nilai{
+		{Kolom: "next_u64_hex", Harapan: hu, Diperoleh: du, Konteks: "next_u64 " + konteks},
+		{Kolom: "next_f64_hex", Harapan: harapanF, Diperoleh: f, Konteks: "next_f64 " + konteks},
+	}, true, nil
 }
 
 // periksaCertainty mencocokkan perhitungan certainty factor.
-func periksaCertainty(baris []string) (float64, float64, string, bool, error) {
+func periksaCertainty(baris []string) ([]Nilai, bool, error) {
 	if len(baris) < 4 {
-		return 0, 0, "", false, fmt.Errorf("baris certainty tidak lengkap")
+		return nil, false, fmt.Errorf("baris certainty tidak lengkap")
 	}
 	a, err := hexAtau(baris[1])
 	if err != nil {
-		return 0, 0, "", false, err
+		return nil, false, err
 	}
 	b, err := hexAtau(baris[2])
 	if err != nil {
-		return 0, 0, "", false, err
+		return nil, false, err
 	}
 	harapan, err := hexAtau(baris[3])
 	if err != nil {
-		return 0, 0, "", false, err
+		return nil, false, err
 	}
 
 	var diperoleh float64
@@ -295,49 +321,44 @@ func periksaCertainty(baris []string) (float64, float64, string, bool, error) {
 	case "mb_md":
 		diperoleh = aicore.CfDariMbMd(a, b)
 	default:
-		return 0, 0, "", false, nil
+		return nil, false, nil
 	}
-	return harapan, diperoleh, fmt.Sprintf("%s(%v, %v)", baris[0], a, b), true, nil
+	return []Nilai{{
+		Kolom:     "result_hex",
+		Harapan:   harapan,
+		Diperoleh: diperoleh,
+		Konteks:   fmt.Sprintf("%s(%v, %v)", baris[0], a, b),
+	}}, true, nil
 }
 
 // periksaBayes mencocokkan perhitungan Bayesian.
-func periksaBayes(baris []string) (float64, float64, string, bool, error) {
+func periksaBayes(baris []string) ([]Nilai, bool, error) {
 	if len(baris) < 6 {
-		return 0, 0, "", false, fmt.Errorf("baris bayes tidak lengkap")
+		return nil, false, fmt.Errorf("baris bayes tidak lengkap")
 	}
 	nilai := make([]float64, 6)
 	for i := 0; i < 6; i++ {
 		v, err := hexAtau(baris[i])
 		if err != nil {
-			return 0, 0, "", false, err
+			return nil, false, err
 		}
 		nilai[i] = v
 	}
 	hasil := aicore.BayesBiner(nilai[0], nilai[1], nilai[2])
+	konteks := fmt.Sprintf("prior %v", nilai[0])
 
-	// Tiga besaran diperiksa; yang pertama meleset dilaporkan.
-	pasangan := []struct {
-		nama    string
-		harapan float64
-		nyata   float64
-	}{
-		{"P(E)", nilai[3], hasil.Bukti},
-		{"P(H|E)", nilai[4], hasil.Posterior},
-		{"LR+", nilai[5], hasil.RasioKemungkinan},
-	}
-	for _, p := range pasangan {
-		if !aicore.SamaBit(p.harapan, p.nyata) {
-			return p.harapan, p.nyata,
-				fmt.Sprintf("%s pada prior %v", p.nama, nilai[0]), true, nil
-		}
-	}
-	return nilai[3], hasil.Bukti, "P(E)", true, nil
+	lr := hasil.RasioKemungkinan
+	return []Nilai{
+		{Kolom: "evidence_hex", Harapan: nilai[3], Diperoleh: hasil.Bukti, Konteks: "P(E) pada " + konteks},
+		{Kolom: "posterior_hex", Harapan: nilai[4], Diperoleh: hasil.Posterior, Konteks: "P(H|E) pada " + konteks},
+		{Kolom: "likelihood_ratio_hex", Harapan: nilai[5], Diperoleh: lr, Konteks: "LR+ pada " + konteks},
+	}, true, nil
 }
 
 // periksaFuzzyLinear mencocokkan keanggotaan segitiga dan trapesium.
-func periksaFuzzyLinear(baris []string) (float64, float64, string, bool, error) {
+func periksaFuzzyLinear(baris []string) ([]Nilai, bool, error) {
 	if len(baris) < 7 {
-		return 0, 0, "", false, fmt.Errorf("baris fuzzy tidak lengkap")
+		return nil, false, fmt.Errorf("baris fuzzy tidak lengkap")
 	}
 	p1, _ := hexAtau(baris[1])
 	p2, _ := hexAtau(baris[2])
@@ -345,11 +366,11 @@ func periksaFuzzyLinear(baris []string) (float64, float64, string, bool, error) 
 	p4, _ := hexAtau(baris[4])
 	x, err := hexAtau(baris[5])
 	if err != nil {
-		return 0, 0, "", false, err
+		return nil, false, err
 	}
 	harapan, err := hexAtau(baris[6])
 	if err != nil {
-		return 0, 0, "", false, err
+		return nil, false, err
 	}
 
 	var diperoleh float64
@@ -359,25 +380,30 @@ func periksaFuzzyLinear(baris []string) (float64, float64, string, bool, error) 
 	case "trapezoidal":
 		diperoleh = aicore.KeanggotaanTrapesium(p1, p2, p3, p4, x)
 	default:
-		return 0, 0, "", false, nil
+		return nil, false, nil
 	}
-	return harapan, diperoleh, fmt.Sprintf("%s pada x=%v", baris[0], x), true, nil
+	return []Nilai{{
+		Kolom:     "degree_hex",
+		Harapan:   harapan,
+		Diperoleh: diperoleh,
+		Konteks:   fmt.Sprintf("%s pada x=%v", baris[0], x),
+	}}, true, nil
 }
 
 // periksaFuzzyTranscendental mencocokkan keanggotaan Gauss dan sigmoid.
-func periksaFuzzyTranscendental(baris []string) (float64, float64, string, bool, error) {
+func periksaFuzzyTranscendental(baris []string) ([]Nilai, bool, error) {
 	if len(baris) < 5 {
-		return 0, 0, "", false, fmt.Errorf("baris fuzzy tidak lengkap")
+		return nil, false, fmt.Errorf("baris fuzzy tidak lengkap")
 	}
 	p1, _ := hexAtau(baris[1])
 	p2, _ := hexAtau(baris[2])
 	x, err := hexAtau(baris[3])
 	if err != nil {
-		return 0, 0, "", false, err
+		return nil, false, err
 	}
 	harapan, err := hexAtau(baris[4])
 	if err != nil {
-		return 0, 0, "", false, err
+		return nil, false, err
 	}
 
 	var diperoleh float64
@@ -387,24 +413,34 @@ func periksaFuzzyTranscendental(baris []string) (float64, float64, string, bool,
 	case "sigmoid":
 		diperoleh = aicore.KeanggotaanSigmoid(p1, p2, x)
 	default:
-		return 0, 0, "", false, nil
+		return nil, false, nil
 	}
-	return harapan, diperoleh, fmt.Sprintf("%s pada x=%v", baris[0], x), true, nil
+	return []Nilai{{
+		Kolom:     "degree_hex",
+		Harapan:   harapan,
+		Diperoleh: diperoleh,
+		Konteks:   fmt.Sprintf("%s pada x=%v", baris[0], x),
+	}}, true, nil
 }
 
 // periksaMlExact mencocokkan jarak dan ketakmurnian Gini.
-func periksaMlExact(baris []string) (float64, float64, string, bool, error) {
+func periksaMlExact(baris []string) ([]Nilai, bool, error) {
 	if len(baris) < 6 {
-		return 0, 0, "", false, fmt.Errorf("baris ml tidak lengkap")
+		return nil, false, fmt.Errorf("baris ml tidak lengkap")
 	}
 	harapan, err := hexAtau(baris[5])
 	if err != nil {
-		return 0, 0, "", false, err
+		return nil, false, err
 	}
 
 	if baris[0] == "gini" {
 		labels := strings.Split(baris[1], ",")
-		return harapan, aicore.Gini(labels), "gini " + baris[1], true, nil
+		return []Nilai{{
+			Kolom:     "result_hex",
+			Harapan:   harapan,
+			Diperoleh: aicore.Gini(labels),
+			Konteks:   "gini " + baris[1],
+		}}, true, nil
 	}
 
 	ax, _ := hexAtau(baris[1])
@@ -423,35 +459,49 @@ func periksaMlExact(baris []string) (float64, float64, string, bool, error) {
 	case "chebyshev":
 		diperoleh = aicore.JarakChebyshev(a, b)
 	default:
-		return 0, 0, "", false, nil
+		return nil, false, nil
 	}
-	return harapan, diperoleh, fmt.Sprintf("%s(%v, %v)", baris[0], a, b), true, nil
+	return []Nilai{{
+		Kolom:     "result_hex",
+		Harapan:   harapan,
+		Diperoleh: diperoleh,
+		Konteks:   fmt.Sprintf("%s(%v, %v)", baris[0], a, b),
+	}}, true, nil
 }
 
 // periksaMlEntropy mencocokkan entropi dan perolehan informasi.
-func periksaMlEntropy(baris []string) (float64, float64, string, bool, error) {
+func periksaMlEntropy(baris []string) ([]Nilai, bool, error) {
 	if len(baris) < 4 {
-		return 0, 0, "", false, fmt.Errorf("baris entropi tidak lengkap")
+		return nil, false, fmt.Errorf("baris entropi tidak lengkap")
 	}
 	harapan, err := hexAtau(baris[3])
 	if err != nil {
-		return 0, 0, "", false, err
+		return nil, false, err
 	}
 	labels := strings.Split(baris[1], ",")
 
 	switch baris[0] {
 	case "entropy":
-		return harapan, aicore.Entropi(labels), "entropi " + baris[1], true, nil
+		return []Nilai{{
+			Kolom:     "result_hex",
+			Harapan:   harapan,
+			Diperoleh: aicore.Entropi(labels),
+			Konteks:   "entropi " + baris[1],
+		}}, true, nil
 	case "information_gain":
 		bagian := strings.SplitN(baris[2], "=", 2)
 		if len(bagian) != 2 {
-			return 0, 0, "", false, fmt.Errorf("atribut tidak terbaca: %q", baris[2])
+			return nil, false, fmt.Errorf("atribut tidak terbaca: %q", baris[2])
 		}
 		values := strings.Split(bagian[1], ",")
-		return harapan, aicore.PerolehanInformasi(values, labels),
-			"perolehan " + bagian[0], true, nil
+		return []Nilai{{
+			Kolom:     "result_hex",
+			Harapan:   harapan,
+			Diperoleh: aicore.PerolehanInformasi(values, labels),
+			Konteks:   "perolehan " + bagian[0],
+		}}, true, nil
 	}
-	return 0, 0, "", false, nil
+	return nil, false, nil
 }
 
 // periksaMlGain mencocokkan perolehan informasi.
@@ -459,39 +509,48 @@ func periksaMlEntropy(baris []string) (float64, float64, string, bool, error) {
 // Terpisah dari entropi karena tingkat keterbandingannya berbeda: hasilnya
 // adalah selisih dua entropi yang hampir sama besar, sehingga toleransinya
 // diukur pada kolom skala, bukan pada hasilnya.
-func periksaMlGain(baris []string) (float64, float64, string, bool, error) {
+func periksaMlGain(baris []string) ([]Nilai, bool, error) {
 	if len(baris) < 5 {
-		return 0, 0, "", false, fmt.Errorf("baris perolehan tidak lengkap")
+		return nil, false, fmt.Errorf("baris perolehan tidak lengkap")
 	}
 	harapan, err := hexAtau(baris[4])
 	if err != nil {
-		return 0, 0, "", false, err
+		return nil, false, err
 	}
 	labels := strings.Split(baris[1], ",")
 	bagian := strings.SplitN(baris[2], "=", 2)
 	if len(bagian) != 2 {
-		return 0, 0, "", false, fmt.Errorf("atribut tidak terbaca: %q", baris[2])
+		return nil, false, fmt.Errorf("atribut tidak terbaca: %q", baris[2])
 	}
 	values := strings.Split(bagian[1], ",")
-	return harapan, aicore.PerolehanInformasi(values, labels),
-		"perolehan " + bagian[0], true, nil
+	return []Nilai{{
+		Kolom:     "result_hex",
+		Harapan:   harapan,
+		Diperoleh: aicore.PerolehanInformasi(values, labels),
+		Konteks:   "perolehan " + bagian[0],
+	}}, true, nil
 }
 
 // periksaFx mencocokkan bolak-balik pola bit.
-func periksaFx(baris []string) (float64, float64, string, bool, error) {
+func periksaFx(baris []string) ([]Nilai, bool, error) {
 	if len(baris) < 2 {
-		return 0, 0, "", false, fmt.Errorf("baris fx tidak lengkap")
+		return nil, false, fmt.Errorf("baris fx tidak lengkap")
 	}
 	v, err := hexAtau(baris[1])
 	if err != nil {
-		return 0, 0, "", false, err
+		return nil, false, err
 	}
 	// Membaca hex lalu menuliskannya kembali harus menghasilkan teks yang sama.
 	ulang, err := hexAtau(aicore.KeHex(v))
 	if err != nil {
-		return 0, 0, "", false, err
+		return nil, false, err
 	}
-	return v, ulang, "bolak-balik " + baris[0], true, nil
+	return []Nilai{{
+		Kolom:     "hex",
+		Harapan:   v,
+		Diperoleh: ulang,
+		Konteks:   "bolak-balik " + baris[0],
+	}}, true, nil
 }
 
 var pemeriksaBerkas = map[string]pemeriksa{
@@ -531,7 +590,7 @@ func PeriksaBerkas(b *Berkas) (Hasil, error) {
 
 	hasil := Hasil{Berkas: b.Nama, Keterbandingan: b.Keterbandingan.Nama}
 	for i, baris := range b.Baris {
-		harapan, diperoleh, konteks, ditangani, err := fn(baris)
+		nilai, ditangani, err := fn(baris)
 		if err != nil {
 			return hasil, fmt.Errorf("%s baris %d: %w", b.Nama, i+1, err)
 		}
@@ -539,7 +598,6 @@ func PeriksaBerkas(b *Berkas) (Hasil, error) {
 			hasil.Dilewati++
 			continue
 		}
-		hasil.Diperiksa++
 		skala := math.NaN()
 		if kolomSkala >= 0 {
 			if kolomSkala >= len(baris) {
@@ -550,24 +608,98 @@ func PeriksaBerkas(b *Berkas) (Hasil, error) {
 				return hasil, fmt.Errorf("%s baris %d: skala tidak terbaca: %w", b.Nama, i+1, err)
 			}
 		}
-		if !b.Keterbandingan.TerpenuhiSkala(harapan, diperoleh, skala) {
+
+		// Dihitung per besaran, bukan per baris. Satu baris `bayes.tsv`
+		// menghasilkan tiga pernyataan dan satu baris `rng.tsv` dua, jadi
+		// menghitung baris membuat Go melaporkan 2.266 sementara Lua dan
+		// Oracle melaporkan 3.796 untuk vektor yang sama persis.
+		for _, v := range nilai {
+			hasil.Diperiksa++
+			if b.Keterbandingan.TerpenuhiSkala(v.Harapan, v.Diperoleh, skala) {
+				continue
+			}
 			hasil.Gagal = append(hasil.Gagal, Ketidakcocokan{
 				Berkas:    b.Nama,
 				Baris:     i + 1,
-				Konteks:   konteks,
-				Harapan:   harapan,
-				Diperoleh: diperoleh,
-				JarakUlp:  aicore.JarakUlp(harapan, diperoleh),
+				Konteks:   v.Konteks,
+				Harapan:   v.Harapan,
+				Diperoleh: v.Diperoleh,
+				JarakUlp:  aicore.JarakUlp(v.Harapan, v.Diperoleh),
 			})
 		}
 	}
 	return hasil, nil
 }
 
+// PancarkanBerkas menuliskan pola bit yang dihitung Go untuk seluruh baris.
+//
+// Perhitungannya sama persis dengan yang dipakai memeriksa — daftar `Nilai`
+// yang sama, dari fungsi yang sama. Yang berbeda hanya apa yang dilakukan
+// terhadapnya: dibandingkan, atau dituliskan.
+func PancarkanBerkas(b *Berkas, tulis func(baris int, kolom, hex, konteks string)) error {
+	fn, ada := pemeriksaBerkas[b.Nama]
+	if !ada {
+		return fmt.Errorf("tidak ada pemeriksa untuk %s", b.Nama)
+	}
+	for i, baris := range b.Baris {
+		nilai, ditangani, err := fn(baris)
+		if err != nil {
+			return fmt.Errorf("%s baris %d: %w", b.Nama, i+1, err)
+		}
+		if !ditangani {
+			continue
+		}
+		for _, v := range nilai {
+			tulis(i+1, v.Kolom, aicore.KeHex(v.Diperoleh), v.Konteks)
+		}
+	}
+	return nil
+}
+
+// pancar menuliskan pola bit Go ke keluaran baku dalam bentuk TSV.
+//
+// Berkasnya dibaca halaman "Enam bahasa, satu angka": ia memasangkan hasil tiap
+// bahasa lewat kunci (berkas, baris, kolom). Kuncinya sengaja sama dengan yang
+// dipakai tabel `ai_conformance_vector` di Oracle, supaya keenam bahasa bisa
+// disandingkan tanpa satu pun penyesuaian.
+func pancar(dir string, entri []os.DirEntry) error {
+	out := bufio.NewWriter(os.Stdout)
+	defer out.Flush()
+
+	fmt.Fprintln(out, "# ai-atlas — pola bit yang dihitung Go")
+	fmt.Fprintln(out, "# bahasa: go")
+	fmt.Fprintf(out, "# versi: %s\n", runtime.Version())
+	fmt.Fprintf(out, "# dihasilkan: %s\n", time.Now().UTC().Format(time.RFC3339))
+	fmt.Fprintln(out, "# perintah: go run ./tools/conform --pancar")
+	fmt.Fprintln(out, "# kolom: berkas\tbaris\tkolom\thasil_hex\tkonteks")
+
+	for _, e := range entri {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".tsv") {
+			continue
+		}
+		berkas, err := MuatBerkas(filepath.Join(dir, e.Name()))
+		if err != nil {
+			return err
+		}
+		nama := e.Name()
+		if err := PancarkanBerkas(berkas, func(baris int, kolom, hex, konteks string) {
+			fmt.Fprintf(out, "%s\t%d\t%s\t%s\t%s\n", nama, baris, kolom, hex, konteks)
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func main() {
 	dir := "vectors"
-	if len(os.Args) > 1 {
-		dir = os.Args[1]
+	memancar := false
+	for _, a := range os.Args[1:] {
+		if a == "--pancar" {
+			memancar = true
+			continue
+		}
+		dir = a
 	}
 
 	entri, err := os.ReadDir(dir)
@@ -575,6 +707,14 @@ func main() {
 		fmt.Fprintf(os.Stderr, "gagal membaca %s: %v\n", dir, err)
 		fmt.Fprintln(os.Stderr, "jalankan `cargo run -p ai-core --bin export_vectors` lebih dulu")
 		os.Exit(1)
+	}
+
+	if memancar {
+		if err := pancar(dir, entri); err != nil {
+			fmt.Fprintf(os.Stderr, "GAGAL: %v\n", err)
+			os.Exit(1)
+		}
+		return
 	}
 
 	fmt.Println("Konformansi Rust terhadap Go — AI ATLAS .Deckyx")

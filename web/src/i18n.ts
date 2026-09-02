@@ -78,6 +78,8 @@ export const T = {
   ),
   labs: bi("Laboratorium", "Laboratories"),
   soon: bi("Segera", "Soon"),
+  lintasBahasa: bi("Lintas bahasa", "Across languages"),
+  enamBahasa: bi("Enam bahasa, satu angka", "Six languages, one number"),
   loading: bi("Memuat mesin WebAssembly…", "Loading the WebAssembly engine…"),
   loadFailed: bi("Mesin gagal dimuat", "The engine failed to load"),
   reload: bi("Muat ulang", "Reload"),
