@@ -138,6 +138,45 @@ Yang benar adalah menyatakan toleransinya di tempat aritmetikanya sungguh-sunggu
 
 Penggolongan ini menentukan bentuk harness Go dan PL/SQL. Tanpa itu, seluruh perbandingan tiga arah akan dibangun di atas asumsi yang salah.
 
+## Enam bahasa, satu angka
+
+Halaman **[`#/enam-bahasa`](https://xyb3rpunq.github.io/ai-atlas/#/enam-bahasa)** menaruh jawaban keenam implementasi berdampingan untuk satu vektor yang sama, sampai ke bitnya.
+
+Kalimat "keenamnya sepakat" sudah tertulis di README keempat situs. Yang belum pernah bisa dilihat siapa pun adalah **rupa** kesepakatan itu — dan "sepakat" pada bilangan pecahan bukan satu hal melainkan empat.
+
+Terukur pada jalan terakhir, 3.796 pernyataan per bahasa:
+
+| Bahasa | Identik | Tanda nol | Beda, masih lolos | Melebihi tingkat | ULP terjauh |
+|---|---:|---:|---:|---:|---:|
+| Go | 3.749 | 0 | 47 | **0** | 4 |
+| Oracle PL/SQL | 3.747 | 44 | 5 | **0** | 64 |
+| Lua | 3.796 | 0 | 0 | **0** | 0 |
+| Swift | 3.796 | 0 | 0 | **0** | 0 |
+| Python | 3.796 | 0 | 0 | **0** | 0 |
+
+**Lua, Swift, dan Python menghasilkan pola bit yang sama persis dengan Rust pada seluruh 3.796 pernyataan** — tanpa satu bit pun berbeda. Go berbeda pada 47, seluruhnya menyentuh `exp` atau `log₂`. Oracle berbeda pada 49: 44 di antaranya hanya soal tanda nol, dan lima sisanya selisih yang tingkatnya memang mengizinkan.
+
+Kolom "melebihi tingkat" yang seluruhnya nol adalah pernyataan yang sesungguhnya. Ia lebih lemah daripada "seluruhnya identik" — dan klaim yang lebih kuat itu justru **tidak benar**, sebagaimana terlihat di baris Go dan Oracle.
+
+### Dari mana angkanya
+
+Tidak satu pun dihitung ulang oleh halaman itu. Halaman yang menghitung sendiri jawaban enam bahasa lain hanya menampilkan pendapat JavaScript tentang keenamnya.
+
+Setiap pola bit dipancarkan bahasa itu sendiri, dari jalan konformansinya sendiri, lewat panggilan yang sama yang membandingkannya:
+
+| Bahasa | Perintah | Dijalankan di |
+|---|---|---|
+| Rust | `cargo run -p ai-core --bin export_vectors` | vektornya sendiri adalah keluaran Rust |
+| Go | `go run ./tools/conform --pancar` | CI, artefak `pola-bit-go` |
+| Oracle PL/SQL | `bash oracle/run.sh` | CI, artefak `pola-bit-plsql` |
+| Lua | `npm run pancar` | repositori `kecerdasan-buatan` |
+| Swift | `aikit-cli pancar` | CI `ind323-ai-lab`, artefak `pola-bit-swift` |
+| Python | `python conformance/pancar.py` | repositori `neuronusa` |
+
+Go, PL/SQL, dan Swift datang sebagai artefak CI karena ketiganya tidak terpasang di mesin tempat halaman ini disusun. Berkas pancarannya dikomit apa adanya di `pola-bit/`, sehingga siapa pun bisa menurunkan ulang tabel di atas tanpa mempercayai satu baris pun dari sini.
+
+`npm run pola-bit` menyatukan keenamnya menjadi `web/src/data/pola-bit.json`: delapan vektor tengara lengkap dengan pola bit tiap bahasa, ditambah ringkasan seluruh 3.796 pernyataan. Yang diterbitkan hanya 11,5 KB — enam bahasa dikali 3.796 pernyataan berukuran sekitar 1,4 MB, sementara seluruh situs ini beranggaran 460 KB.
+
 ## Visualisasi di setiap modul
 
 Setiap laboratorium menampilkan besarannya sebagai gambar, bukan hanya tabel. Yang menentukan bentuk gambarnya adalah pertanyaan yang ingin dijawab, bukan variasi:
@@ -277,11 +316,12 @@ Setiap fungsi publik punya uji. Bukan uji jalur bahagia saja — uji nilai batas
 | `web/src/labs/notes.ts` | 1 | 54 |
 | `web/src/labs/registry.ts` | 2 | 21 |
 | `web/src/ekspor.ts` | 7 | 29 |
+| `web/src/enam-bahasa.ts` | 6 | 17 |
 | `tools/conform` (Go) | 23 | 12 |
 | `oracle/` (PL/SQL) | 27 | 60 |
-| **Total** | **413** | **788** |
+| **Total** | **419** | **805** |
 
-Ditambah **3.796 pernyataan konformansi** yang mengadu ketiga implementasi terhadap vektor yang sama. Angka itu bukan bagian dari 759 di atas: uji unit membuktikan tiap implementasi konsisten dengan dirinya sendiri, sedangkan konformansi membuktikan ketiganya sepakat satu sama lain — dan hanya yang kedua yang bisa menangkap rumus yang salah tetapi konsisten.
+Ditambah **3.796 pernyataan konformansi** yang mengadu keenam implementasi terhadap vektor yang sama. Angka itu bukan bagian dari 805 di atas: uji unit membuktikan tiap implementasi konsisten dengan dirinya sendiri, sedangkan konformansi membuktikan ketiganya sepakat satu sama lain — dan hanya yang kedua yang bisa menangkap rumus yang salah tetapi konsisten.
 
 Beberapa uji yang menahan seluruh proyek ini tetap jujur:
 
@@ -295,6 +335,13 @@ Beberapa uji yang menahan seluruh proyek ini tetap jujur:
   keluaran. Uji inilah yang menemukan bug himpunan bahu.
 - **Reproduktifitas** — benih yang sama harus menghasilkan bobot, labirin, dan
   jejak pencarian yang identik bit demi bit.
+- **Tidak satu pun selisih boleh melebihi tingkatnya** — uji halaman lintas-bahasa
+  menuntut kolom "melebihi tingkat" tetap nol untuk keenam bahasa. Kalau suatu
+  hari tidak, yang dibutuhkan penyelidikan, bukan pelonggaran.
+- **Keenam bahasa harus benar-benar terkumpul** — bahasa yang berkas pola bitnya
+  hilang muncul sebagai kolom kosong, dan kolom kosong terbaca sebagai
+  perbedaan. Halaman yang menampilkan lima bahasa dengan judul "enam bahasa"
+  salah dua kali sekaligus.
 - **Laporan ekspor dibangun dari komponen sungguhan** — ujinya menyusun kartu,
   penggeser, dan tabel lewat `ui.ts` yang sama seperti yang dipakai
   laboratorium, lalu memeriksa hasil bacaannya. Kalau suatu hari sebuah
@@ -480,6 +527,44 @@ test values (13.8%), while Rust's own `str::parse::<f64>` had zero errors.
    in the result (≈ 0.029). This produced a fourth comparability tier,
    `CancellingDifference(n)`, which measures tolerance at the **input** scale:
    `|a − b| ≤ n × ulp(scale)`.
+
+### Six languages, one number
+
+The page **[`#/enam-bahasa`](https://xyb3rpunq.github.io/ai-atlas/#/enam-bahasa)**
+puts all six implementations' answers side by side for the same vector, down to
+the bit.
+
+The sentence "all six agree" already appears in four READMEs. What has never
+been visible is what that agreement *looks* like — and "agreement" between
+floating-point numbers is not one thing but four.
+
+Measured on the last run, 3,796 statements per language:
+
+| Language | Identical | Zero sign | Differs, still passes | Exceeds tier | Widest ULP |
+|---|---:|---:|---:|---:|---:|
+| Go | 3,749 | 0 | 47 | **0** | 4 |
+| Oracle PL/SQL | 3,747 | 44 | 5 | **0** | 64 |
+| Lua | 3,796 | 0 | 0 | **0** | 0 |
+| Swift | 3,796 | 0 | 0 | **0** | 0 |
+| Python | 3,796 | 0 | 0 | **0** | 0 |
+
+**Lua, Swift, and Python produce bit patterns identical to Rust across all
+3,796 statements** — not one bit differs. Go differs on 47, every one of them
+touching `exp` or `log₂`. Oracle differs on 49: 44 are purely the sign of zero,
+and the remaining five are differences its tier permits.
+
+The "exceeds tier" column being entirely zero is the claim that actually holds.
+It is weaker than "all identical" — and that stronger claim would be **false**,
+as the Go and Oracle rows show.
+
+Not one of these numbers is recomputed by the page. A page that computed six
+other languages' answers itself would only be showing JavaScript's opinion of
+all six. Every bit pattern is emitted by that language, from its own
+conformance run, through the same call that compares it. Go, PL/SQL, and Swift
+arrive as CI artefacts because none of the three is installed on the machine
+where this page is assembled; the emitted files are committed verbatim under
+`pola-bit/`, so anyone can re-derive the table above without trusting a line of
+this README.
 
 ### Visualisation in every module
 

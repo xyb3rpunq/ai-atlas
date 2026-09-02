@@ -1,0 +1,871 @@
+{
+  "disusun": "2026-09-02T18:47:08Z",
+  "bahasa": [
+    {
+      "kode": "rust",
+      "nama": "Rust",
+      "ada": true,
+      "versi": null,
+      "dihasilkan": null,
+      "perintah": "cargo run -p ai-core --bin export_vectors",
+      "pernyataan": null,
+      "catatan": "acuan"
+    },
+    {
+      "kode": "go",
+      "nama": "Go",
+      "ada": true,
+      "versi": "go1.25.14",
+      "dihasilkan": "2026-09-02T18:31:18Z",
+      "perintah": "go run ./tools/conform --pancar",
+      "pernyataan": 3796,
+      "catatan": null
+    },
+    {
+      "kode": "plsql",
+      "nama": "Oracle PL/SQL",
+      "ada": true,
+      "versi": "gvenzl/oracle-free:23-slim",
+      "dihasilkan": "2026-09-02T18:33:10Z",
+      "perintah": "bash oracle/run.sh",
+      "pernyataan": 3796,
+      "catatan": null
+    },
+    {
+      "kode": "lua",
+      "nama": "Lua",
+      "ada": true,
+      "versi": "Lua 5.4 lewat wasmoon ^1.16.0",
+      "dihasilkan": "2026-09-02T18:25:44Z",
+      "perintah": "npm run pancar",
+      "pernyataan": 3796,
+      "catatan": null
+    },
+    {
+      "kode": "swift",
+      "nama": "Swift",
+      "ada": true,
+      "versi": "Swift 6.2 atau lebih baru",
+      "dihasilkan": "2026-09-02T18:30:59Z",
+      "perintah": "aikit-cli pancar",
+      "pernyataan": 3796,
+      "catatan": null
+    },
+    {
+      "kode": "python",
+      "nama": "Python",
+      "ada": true,
+      "versi": "CPython 3.14.6",
+      "dihasilkan": "2026-09-02T18:27:15Z",
+      "perintah": "python conformance/pancar.py",
+      "pernyataan": 3796,
+      "catatan": null
+    }
+  ],
+  "tengara": [
+    {
+      "id": "nol-negatif-cf",
+      "berkas": "certainty.tsv",
+      "baris": 2,
+      "tingkat": "BitExact",
+      "kolom": [
+        "op",
+        "a_hex",
+        "b_hex",
+        "result_hex"
+      ],
+      "masukan": [
+        "sequential",
+        "bff0000000000000",
+        "bff0000000000000",
+        "8000000000000000"
+      ],
+      "pernyataan": [
+        {
+          "kolom": "result_hex",
+          "hasil": {
+            "rust": "8000000000000000",
+            "go": "8000000000000000",
+            "plsql": "0000000000000000",
+            "lua": "8000000000000000",
+            "swift": "8000000000000000",
+            "python": "8000000000000000"
+          },
+          "golongan": {
+            "rust": "identik",
+            "go": "identik",
+            "plsql": "tandaNol",
+            "lua": "identik",
+            "swift": "identik",
+            "python": "identik"
+          }
+        }
+      ]
+    },
+    {
+      "id": "nol-negatif-entropi",
+      "berkas": "ml_entropy.tsv",
+      "baris": 1,
+      "tingkat": "NearlyEqual(4)",
+      "kolom": [
+        "op",
+        "labels",
+        "values",
+        "result_hex"
+      ],
+      "masukan": [
+        "entropy",
+        "A",
+        "",
+        "8000000000000000"
+      ],
+      "pernyataan": [
+        {
+          "kolom": "result_hex",
+          "hasil": {
+            "rust": "8000000000000000",
+            "go": "8000000000000000",
+            "plsql": "0000000000000000",
+            "lua": "8000000000000000",
+            "swift": "8000000000000000",
+            "python": "8000000000000000"
+          },
+          "golongan": {
+            "rust": "identik",
+            "go": "identik",
+            "plsql": "tandaNol",
+            "lua": "identik",
+            "swift": "identik",
+            "python": "identik"
+          }
+        }
+      ]
+    },
+    {
+      "id": "perolehan-informasi",
+      "berkas": "ml_gain.tsv",
+      "baris": 1,
+      "tingkat": "CancellingDifference(4)",
+      "kolom": [
+        "op",
+        "labels",
+        "values",
+        "scale_hex",
+        "result_hex"
+      ],
+      "masukan": [
+        "information_gain",
+        "Tidak,Tidak,Ya,Ya,Ya,Tidak,Ya,Tidak,Ya,Ya,Ya,Ya,Ya,Tidak",
+        "cuaca=Cerah,Cerah,Mendung,Hujan,Hujan,Hujan,Mendung,Cerah,Cerah,Hujan,Cerah,Mendung,Mendung,Hujan",
+        "3fee16d2942c1b98",
+        "3fcf957f831cd070"
+      ],
+      "pernyataan": [
+        {
+          "kolom": "result_hex",
+          "hasil": {
+            "rust": "3fcf957f831cd070",
+            "go": "3fcf957f831cd070",
+            "plsql": "3fcf957f831cd068",
+            "lua": "3fcf957f831cd070",
+            "swift": "3fcf957f831cd070",
+            "python": "3fcf957f831cd070"
+          },
+          "golongan": {
+            "rust": "identik",
+            "go": "identik",
+            "plsql": "dalamToleransi",
+            "lua": "identik",
+            "swift": "identik",
+            "python": "identik"
+          }
+        }
+      ]
+    },
+    {
+      "id": "transendental",
+      "berkas": "fuzzy_transcendental.tsv",
+      "baris": 1,
+      "tingkat": "NearlyEqual(4)",
+      "kolom": [
+        "shape",
+        "p1_hex",
+        "p2_hex",
+        "x_hex",
+        "degree_hex"
+      ],
+      "masukan": [
+        "gaussian",
+        "4014000000000000",
+        "4000000000000000",
+        "c018000000000000",
+        "3e921dd72e8b8a27"
+      ],
+      "pernyataan": [
+        {
+          "kolom": "degree_hex",
+          "hasil": {
+            "rust": "3e921dd72e8b8a27",
+            "go": "3e921dd72e8b8a27",
+            "plsql": "3e921dd72e8b8a27",
+            "lua": "3e921dd72e8b8a27",
+            "swift": "3e921dd72e8b8a27",
+            "python": "3e921dd72e8b8a27"
+          },
+          "golongan": {
+            "rust": "identik",
+            "go": "identik",
+            "plsql": "identik",
+            "lua": "identik",
+            "swift": "identik",
+            "python": "identik"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pembangkit-acak",
+      "berkas": "rng.tsv",
+      "baris": 1,
+      "tingkat": "BitExact",
+      "kolom": [
+        "seed",
+        "index",
+        "next_u64_hex",
+        "next_f64_hex"
+      ],
+      "masukan": [
+        "0",
+        "0",
+        "e220a8397b1dcdaf",
+        "3fec4415072f63b9"
+      ],
+      "pernyataan": [
+        {
+          "kolom": "next_u64_hex",
+          "hasil": {
+            "rust": "e220a8397b1dcdaf",
+            "go": "e220a8397b1dcdaf",
+            "plsql": "e220a8397b1dcdaf",
+            "lua": "e220a8397b1dcdaf",
+            "swift": "e220a8397b1dcdaf",
+            "python": "e220a8397b1dcdaf"
+          },
+          "golongan": {
+            "rust": "identik",
+            "go": "identik",
+            "plsql": "identik",
+            "lua": "identik",
+            "swift": "identik",
+            "python": "identik"
+          }
+        },
+        {
+          "kolom": "next_f64_hex",
+          "hasil": {
+            "rust": "3fec4415072f63b9",
+            "go": "3fec4415072f63b9",
+            "plsql": "3fec4415072f63b9",
+            "lua": "3fec4415072f63b9",
+            "swift": "3fec4415072f63b9",
+            "python": "3fec4415072f63b9"
+          },
+          "golongan": {
+            "rust": "identik",
+            "go": "identik",
+            "plsql": "identik",
+            "lua": "identik",
+            "swift": "identik",
+            "python": "identik"
+          }
+        }
+      ]
+    },
+    {
+      "id": "bolak-balik",
+      "berkas": "fx.tsv",
+      "baris": 6,
+      "tingkat": "BitExact",
+      "kolom": [
+        "label",
+        "hex",
+        "decimal_text"
+      ],
+      "masukan": [
+        "hasil_bayes_hoaks",
+        "3fdae147ae147ae2",
+        "0.42000000000000004"
+      ],
+      "pernyataan": [
+        {
+          "kolom": "hex",
+          "hasil": {
+            "rust": "3fdae147ae147ae2",
+            "go": "3fdae147ae147ae2",
+            "plsql": "3fdae147ae147ae2",
+            "lua": "3fdae147ae147ae2",
+            "swift": "3fdae147ae147ae2",
+            "python": "3fdae147ae147ae2"
+          },
+          "golongan": {
+            "rust": "identik",
+            "go": "identik",
+            "plsql": "identik",
+            "lua": "identik",
+            "swift": "identik",
+            "python": "identik"
+          }
+        }
+      ]
+    },
+    {
+      "id": "laju-dasar",
+      "berkas": "bayes.tsv",
+      "baris": 74,
+      "tingkat": "BitExact",
+      "kolom": [
+        "prior_hex",
+        "likelihood_h_hex",
+        "likelihood_not_h_hex",
+        "evidence_hex",
+        "posterior_hex",
+        "likelihood_ratio_hex"
+      ],
+      "masukan": [
+        "3f50624dd2f1a9fc",
+        "3fefae147ae147ae",
+        "3f947ae147ae147b",
+        "3f957928e0c9d9d4",
+        "3fa82bf2d0c15f96",
+        "4048c00000000000"
+      ],
+      "pernyataan": [
+        {
+          "kolom": "evidence_hex",
+          "hasil": {
+            "rust": "3f957928e0c9d9d4",
+            "go": "3f957928e0c9d9d4",
+            "plsql": "3f957928e0c9d9d4",
+            "lua": "3f957928e0c9d9d4",
+            "swift": "3f957928e0c9d9d4",
+            "python": "3f957928e0c9d9d4"
+          },
+          "golongan": {
+            "rust": "identik",
+            "go": "identik",
+            "plsql": "identik",
+            "lua": "identik",
+            "swift": "identik",
+            "python": "identik"
+          }
+        },
+        {
+          "kolom": "posterior_hex",
+          "hasil": {
+            "rust": "3fa82bf2d0c15f96",
+            "go": "3fa82bf2d0c15f96",
+            "plsql": "3fa82bf2d0c15f96",
+            "lua": "3fa82bf2d0c15f96",
+            "swift": "3fa82bf2d0c15f96",
+            "python": "3fa82bf2d0c15f96"
+          },
+          "golongan": {
+            "rust": "identik",
+            "go": "identik",
+            "plsql": "identik",
+            "lua": "identik",
+            "swift": "identik",
+            "python": "identik"
+          }
+        },
+        {
+          "kolom": "likelihood_ratio_hex",
+          "hasil": {
+            "rust": "4048c00000000000",
+            "go": "4048c00000000000",
+            "plsql": "4048c00000000000",
+            "lua": "4048c00000000000",
+            "swift": "4048c00000000000",
+            "python": "4048c00000000000"
+          },
+          "golongan": {
+            "rust": "identik",
+            "go": "identik",
+            "plsql": "identik",
+            "lua": "identik",
+            "swift": "identik",
+            "python": "identik"
+          }
+        }
+      ]
+    },
+    {
+      "id": "akar-kuadrat",
+      "berkas": "ml_exact.tsv",
+      "baris": 4,
+      "tingkat": "BitExact",
+      "kolom": [
+        "op",
+        "arg1",
+        "arg2",
+        "arg3",
+        "arg4",
+        "result_hex"
+      ],
+      "masukan": [
+        "euclidean",
+        "3ff8000000000000",
+        "c002000000000000",
+        "bfe0000000000000",
+        "400e000000000000",
+        "40194c583ada5b53"
+      ],
+      "pernyataan": [
+        {
+          "kolom": "result_hex",
+          "hasil": {
+            "rust": "40194c583ada5b53",
+            "go": "40194c583ada5b53",
+            "plsql": "40194c583ada5b53",
+            "lua": "40194c583ada5b53",
+            "swift": "40194c583ada5b53",
+            "python": "40194c583ada5b53"
+          },
+          "golongan": {
+            "rust": "identik",
+            "go": "identik",
+            "plsql": "identik",
+            "lua": "identik",
+            "swift": "identik",
+            "python": "identik"
+          }
+        }
+      ]
+    }
+  ],
+  "ringkasan": [
+    {
+      "berkas": "bayes.tsv",
+      "tingkat": "BitExact",
+      "pernyataan": 2187,
+      "perBahasa": {
+        "go": {
+          "identik": 2187,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "plsql": {
+          "identik": 2187,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "lua": {
+          "identik": 2187,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "swift": {
+          "identik": 2187,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "python": {
+          "identik": 2187,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        }
+      }
+    },
+    {
+      "berkas": "certainty.tsv",
+      "tingkat": "BitExact",
+      "pernyataan": 680,
+      "perBahasa": {
+        "go": {
+          "identik": 680,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "plsql": {
+          "identik": 638,
+          "tandaNol": 42,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "lua": {
+          "identik": 680,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "swift": {
+          "identik": 680,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "python": {
+          "identik": 680,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        }
+      }
+    },
+    {
+      "berkas": "fuzzy_linear.tsv",
+      "tingkat": "BitExact",
+      "pernyataan": 520,
+      "perBahasa": {
+        "go": {
+          "identik": 520,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "plsql": {
+          "identik": 520,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "lua": {
+          "identik": 520,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "swift": {
+          "identik": 520,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "python": {
+          "identik": 520,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        }
+      }
+    },
+    {
+      "berkas": "fuzzy_transcendental.tsv",
+      "tingkat": "NearlyEqual(4)",
+      "pernyataan": 222,
+      "perBahasa": {
+        "go": {
+          "identik": 176,
+          "tandaNol": 0,
+          "dalamToleransi": 46,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 2
+        },
+        "plsql": {
+          "identik": 222,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "lua": {
+          "identik": 222,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "swift": {
+          "identik": 222,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "python": {
+          "identik": 222,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        }
+      }
+    },
+    {
+      "berkas": "fx.tsv",
+      "tingkat": "BitExact",
+      "pernyataan": 14,
+      "perBahasa": {
+        "go": {
+          "identik": 14,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "plsql": {
+          "identik": 13,
+          "tandaNol": 1,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "lua": {
+          "identik": 14,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "swift": {
+          "identik": 14,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "python": {
+          "identik": 14,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        }
+      }
+    },
+    {
+      "berkas": "ml_entropy.tsv",
+      "tingkat": "NearlyEqual(4)",
+      "pernyataan": 7,
+      "perBahasa": {
+        "go": {
+          "identik": 7,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "plsql": {
+          "identik": 5,
+          "tandaNol": 1,
+          "dalamToleransi": 1,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 2
+        },
+        "lua": {
+          "identik": 7,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "swift": {
+          "identik": 7,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "python": {
+          "identik": 7,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        }
+      }
+    },
+    {
+      "berkas": "ml_exact.tsv",
+      "tingkat": "BitExact",
+      "pernyataan": 18,
+      "perBahasa": {
+        "go": {
+          "identik": 18,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "plsql": {
+          "identik": 18,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "lua": {
+          "identik": 18,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "swift": {
+          "identik": 18,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "python": {
+          "identik": 18,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        }
+      }
+    },
+    {
+      "berkas": "ml_gain.tsv",
+      "tingkat": "CancellingDifference(4)",
+      "pernyataan": 4,
+      "perBahasa": {
+        "go": {
+          "identik": 3,
+          "tandaNol": 0,
+          "dalamToleransi": 1,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 4
+        },
+        "plsql": {
+          "identik": 0,
+          "tandaNol": 0,
+          "dalamToleransi": 4,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 64
+        },
+        "lua": {
+          "identik": 4,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "swift": {
+          "identik": 4,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "python": {
+          "identik": 4,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        }
+      }
+    },
+    {
+      "berkas": "rng.tsv",
+      "tingkat": "BitExact",
+      "pernyataan": 144,
+      "perBahasa": {
+        "go": {
+          "identik": 144,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "plsql": {
+          "identik": 144,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "lua": {
+          "identik": 144,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "swift": {
+          "identik": 144,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        },
+        "python": {
+          "identik": 144,
+          "tandaNol": 0,
+          "dalamToleransi": 0,
+          "luarToleransi": 0,
+          "hilang": 0,
+          "ulpTerjauh": 0
+        }
+      }
+    }
+  ]
+}
