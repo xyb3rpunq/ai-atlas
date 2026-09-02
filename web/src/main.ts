@@ -235,6 +235,7 @@ function homePage(): HTMLElement {
           }),
         ],
       }),
+      bagianSaudara(),
     ],
   });
 }
@@ -358,7 +359,7 @@ function labPage(lab: Lab): HTMLElement {
         ],
       }),
       body,
-      exportSection(lab, body),
+      exportSection(pick(lab.title), lab.slug, lab.session, body),
       notesSection(lab.slug),
     ],
   });
@@ -393,7 +394,12 @@ function labPage(lab: Lab): HTMLElement {
  * Keempat belas lab tidak punya bentuk hasil bersama, dan membaca tampilannya
  * membuat satu kode ini berlaku untuk semuanya — termasuk lab yang belum ada.
  */
-function exportSection(lab: Lab, body: HTMLElement): HTMLElement {
+function exportSection(
+  nama: string,
+  slug: string,
+  sesi: number | undefined,
+  body: HTMLElement,
+): HTMLElement {
   const kabar = el("div", { class: "ekspor__kabar", attrs: { "aria-live": "polite" } });
 
   const tombolUnduh = el("button", {
@@ -404,13 +410,17 @@ function exportSection(lab: Lab, body: HTMLElement): HTMLElement {
       click: () => {
         clear(kabar);
         try {
-          const nama = fileName(lab.slug);
+          const namaBerkas = fileName(slug);
           const isi = bacaIsi(body);
-          download(nama, csv(reportRows(pick(lab.title), lab.session, isi)), "text/csv;charset=utf-8");
+          download(
+            namaBerkas,
+            csv(reportRows(nama, sesi, isi)),
+            "text/csv;charset=utf-8",
+          );
           kabar.append(
             el("span", {
               class: "kabar kabar--ok",
-              text: `${pick(EKSPOR_LABEL.downloaded)}: ${nama}`,
+              text: `${pick(EKSPOR_LABEL.downloaded)}: ${namaBerkas}`,
             }),
           );
         } catch (error: unknown) {
@@ -461,7 +471,12 @@ function halamanLintasBahasa(): HTMLElement {
     .then((modul) => {
       if (tokenSaatIni !== muatKe) return;
       clear(wadah);
-      wadah.append(modul.halamanEnamBahasa());
+      const isi = modul.halamanEnamBahasa();
+      wadah.append(isi);
+      // Halaman ini punya tabel seperti laboratorium mana pun, dan orang yang
+      // membukanya justru yang paling mungkin ingin membawa angkanya keluar.
+      // Tanpa sesi kuliah: ia bukan salah satu dari empat belas sesi.
+      wadah.append(exportSection(modul.NAMA_HALAMAN(), SLUG_ENAM_BAHASA, undefined, isi));
     })
     .catch((error: unknown) => {
       if (tokenSaatIni !== muatKe) return;
@@ -492,6 +507,73 @@ function notFoundPage(): HTMLElement {
 }
 
 /** Kaki halaman. */
+/**
+ * Ketiga situs saudara, beserta bahasa yang dipakainya.
+ *
+ * # Kenapa ini ada di antarmuka, bukan hanya di README
+ *
+ * Karena README dibaca orang yang sudah menemukan repositorinya. Pengunjung
+ * yang mendarat di sini dari mesin pencari tidak punya satu pun petunjuk bahwa
+ * tiga situs lain mengerjakan silabus yang sama dalam bahasa lain — dan
+ * justru perbandingan itulah yang membuat keempatnya lebih berarti daripada
+ * jumlahnya.
+ *
+ * Bahasanya ikut disebut karena itulah yang membedakan keempatnya. Empat
+ * tautan tanpa keterangan hanya terbaca sebagai empat alamat.
+ */
+const SAUDARA: { nama: string; bahasa: string; alamat: string }[] = [
+  {
+    nama: "kecerdasan-buatan",
+    bahasa: "Lua",
+    alamat: "https://xyb3rpunq.github.io/kecerdasan-buatan/",
+  },
+  {
+    nama: "ind323-ai-lab",
+    bahasa: "Swift",
+    alamat: "https://xyb3rpunq.github.io/ind323-ai-lab/",
+  },
+  {
+    nama: "neuronusa",
+    bahasa: "Python",
+    alamat: "https://xyb3rpunq.github.io/neuronusa/",
+  },
+];
+
+/** Bagian yang menyebut ketiga situs saudara. */
+function bagianSaudara(): HTMLElement {
+  return el("section", {
+    class: "card saudara",
+    children: [
+      el("h2", { class: "card__title", text: pick(T.keluargaJudul) }),
+      el("p", { class: "note", text: pick(T.keluargaIsi) }),
+      el("div", {
+        class: "saudara__daftar",
+        children: SAUDARA.map((x) =>
+          el("a", {
+            class: "saudara__butir",
+            attrs: { href: x.alamat, rel: "noopener" },
+            children: [
+              el("span", { class: "saudara__nama", text: x.nama }),
+              el("span", { class: "saudara__bahasa", text: x.bahasa }),
+            ],
+          }),
+        ),
+      }),
+      el("p", {
+        class: "note",
+        children: [
+          document.createTextNode(`${pick(T.keluargaTaut)} `),
+          el("a", {
+            attrs: { href: `#/${SLUG_ENAM_BAHASA}` },
+            text: pick(T.enamBahasa),
+          }),
+          document.createTextNode("."),
+        ],
+      }),
+    ],
+  });
+}
+
 function footer(): HTMLElement {
   let engineVersion = "—";
   try {

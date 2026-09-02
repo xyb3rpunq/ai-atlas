@@ -529,6 +529,17 @@ function bagianAsal(): HTMLElement {
   return card(pick(T.asalJudul), ...anak);
 }
 
+/**
+ * Nama halaman untuk kepala berkas ekspor.
+ *
+ * Berupa fungsi, bukan tetapan: bahasanya bisa berganti setelah modul ini
+ * dimuat, dan nama yang dibekukan saat impor akan tetap memakai bahasa yang
+ * aktif waktu itu.
+ */
+export function NAMA_HALAMAN(): string {
+  return pick(T.judul);
+}
+
 /** Seluruh halaman. */
 export function halamanEnamBahasa(): HTMLElement {
   return el("div", {

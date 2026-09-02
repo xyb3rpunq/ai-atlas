@@ -79,6 +79,15 @@ export const T = {
   labs: bi("Laboratorium", "Laboratories"),
   soon: bi("Segera", "Soon"),
   lintasBahasa: bi("Lintas bahasa", "Across languages"),
+  keluargaJudul: bi("Tiga situs saudara", "Three sibling sites"),
+  keluargaIsi: bi(
+    "Silabus IND323 yang sama dikerjakan empat kali, dalam empat bahasa yang berbeda. Bukan salinan satu sama lain: tiap situs punya bentuk dan audiensnya sendiri, dan algoritmanya ditulis ulang dari rumusnya — bukan diterjemahkan dari kode mana pun.",
+    "The same IND323 syllabus, built four times in four different languages. Not copies of one another: each site has its own shape and audience, and its algorithms were written from the formula rather than translated from any existing code.",
+  ),
+  keluargaTaut: bi(
+    "Jawaban keenam implementasi disandingkan sampai ke bitnya di",
+    "All six implementations' answers are placed side by side, down to the bit, in",
+  ),
   enamBahasa: bi("Enam bahasa, satu angka", "Six languages, one number"),
   loading: bi("Memuat mesin WebAssembly…", "Loading the WebAssembly engine…"),
   loadFailed: bi("Mesin gagal dimuat", "The engine failed to load"),

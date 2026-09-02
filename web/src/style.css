@@ -912,6 +912,47 @@ canvas {
  * menentukan bentuk berkas PDF yang disimpan pengguna — bukan sekadar bentuk
  * kertas yang jarang dipakai siapa pun.
  */
+/* ------------------------------------------------------- situs saudara */
+
+.saudara__daftar {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  margin: 0.8rem 0;
+}
+
+.saudara__butir {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  text-decoration: none;
+  color: var(--text);
+  transition: border-color 120ms ease;
+}
+
+.saudara__butir:hover,
+.saudara__butir:focus-visible {
+  border-color: var(--accent);
+}
+
+.saudara__nama {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+/* Bahasanya yang membedakan keempat situs, jadi ia diberi warna aksen alih-alih
+   diperlakukan sebagai keterangan tambahan. */
+.saudara__bahasa {
+  font-size: 0.75rem;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
 /* ------------------------------------------------------------- peta bit */
 /*
  * Enam puluh empat kotak, satu per bit.
@@ -1105,6 +1146,16 @@ canvas {
      angka tanpa nama kolom tidak berarti apa-apa. */
   thead {
     display: table-header-group;
+  }
+
+  /* Peta bit tidak ikut tercetak.
+     Empat ribu dua ratus dua puluh empat kotak berukuran sepersepuluh
+     sentimeter menjadi bidang abu-abu di atas kertas: tintanya habis dan
+     tidak ada satu pun bit yang bisa dibedakan. Pola bitnya sendiri tetap
+     tercetak — ia ada sebagai teks heksadesimal di tabel tepat di atasnya,
+     dan di sanalah ia sebenarnya bisa dibaca. */
+  .peta-bit__baris {
+    display: none !important;
   }
 
   tr {

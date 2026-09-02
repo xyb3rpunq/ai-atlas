@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Dihasilkan `npm run sitemap` dari web/src/labs/registry.ts. -->
+<!-- Jangan disunting tangan: yang disunting tangan tidak ikut bertambah. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
@@ -7,6 +9,21 @@
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="id" href="https://xyb3rpunq.github.io/ai-atlas/"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://xyb3rpunq.github.io/ai-atlas/"/>
+  </url>
+  <url>
+    <loc>https://xyb3rpunq.github.io/ai-atlas/#/enam-bahasa</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://xyb3rpunq.github.io/ai-atlas/#/eliza</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://xyb3rpunq.github.io/ai-atlas/#/agents</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
   </url>
   <url>
     <loc>https://xyb3rpunq.github.io/ai-atlas/#/certainty-factor</loc>
@@ -20,6 +37,41 @@
   </url>
   <url>
     <loc>https://xyb3rpunq.github.io/ai-atlas/#/fuzzy-logic</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://xyb3rpunq.github.io/ai-atlas/#/search</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://xyb3rpunq.github.io/ai-atlas/#/neural-network</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://xyb3rpunq.github.io/ai-atlas/#/expert-system</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://xyb3rpunq.github.io/ai-atlas/#/machine-learning</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://xyb3rpunq.github.io/ai-atlas/#/nlp</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://xyb3rpunq.github.io/ai-atlas/#/knowledge</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://xyb3rpunq.github.io/ai-atlas/#/robotics</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
