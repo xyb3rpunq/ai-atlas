@@ -390,10 +390,7 @@ pub fn english_script() -> Script {
             rule(
                 "i want",
                 9,
-                &[
-                    "What would change if you got {}?",
-                    "Why do you want {}?",
-                ],
+                &["What would change if you got {}?", "Why do you want {}?"],
             ),
             rule(
                 "i can't",
@@ -403,11 +400,7 @@ pub fn english_script() -> Script {
                     "What would have to change before you could {}?",
                 ],
             ),
-            rule(
-                "i",
-                5,
-                &["Tell me more about {}.", "Why do you say {}?"],
-            ),
+            rule("i", 5, &["Tell me more about {}.", "Why do you say {}?"]),
             rule(
                 "mother",
                 8,
