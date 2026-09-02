@@ -30,7 +30,7 @@ import type { GraphEdge, GraphNode } from "../viz.js";
  * memutus pewarisannya — "penguin is-a bird" tidak akan pernah mewarisi sifat
  * yang tertulis pada "burung".
  */
-const NAMA: KamusNama = {
+export const NAMA: KamusNama = {
   adalah: bi("adalah", "is-a"),
   punya: bi("punya", "has"),
   bisa: bi("bisa", "can"),
@@ -41,6 +41,10 @@ const NAMA: KamusNama = {
   terbang: bi("terbang", "fly"),
   berenang: bi("berenang", "swim"),
   sel: bi("sel", "cells"),
+  elang: bi("elang", "eagle"),
+  cakar: bi("cakar", "talons"),
+  kutub: bi("kutub", "the poles"),
+  "tinggal di": bi("tinggal di", "lives in"),
 };
 
 /**
@@ -442,14 +446,14 @@ export function mount(root: HTMLElement): () => void {
             title: bi("Jaringan semantik", "Semantic network"),
             summary: bi(
               `Panah menunjuk dari yang umum ke yang khusus. Simpul bertepi tebal adalah ` +
-                `"${view.selected}" beserta ${view.ancestors.length} leluhurnya, yaitu jalur ` +
+                `"${nama(NAMA, view.selected)}" beserta ${view.ancestors.length} leluhurnya, yaitu jalur ` +
                 `yang dilalui pewarisan sifat. Dari ${langsung.length + warisan.length} sifat ` +
-                `yang dimiliki "${view.selected}", hanya ${langsung.length} yang benar-benar ` +
+                `yang dimiliki "${nama(NAMA, view.selected)}", hanya ${langsung.length} yang benar-benar ` +
                 `dituliskan padanya; sisanya datang menuruni panah-panah ini.`,
               `Arrows point from the general to the specific. Thick-edged nodes are ` +
-                `"${view.selected}" and its ${view.ancestors.length} ancestors — the path ` +
+                `"${nama(NAMA, view.selected)}" and its ${view.ancestors.length} ancestors — the path ` +
                 `inheritance travels. Of the ${langsung.length + warisan.length} properties ` +
-                `"${view.selected}" has, only ${langsung.length} are actually written on it; ` +
+                `"${nama(NAMA, view.selected)}" has, only ${langsung.length} are actually written on it; ` +
                 `the rest arrive down these arrows.`,
             ),
             body: nodeGraph(graf.nodes, graf.edges),
@@ -460,7 +464,7 @@ export function mount(root: HTMLElement): () => void {
           }),
         ),
         card(
-          `${pick(bi("Sifat", "Properties"))}: ${view.selected}`,
+          `${pick(bi("Sifat", "Properties"))}: ${nama(NAMA, view.selected)}`,
           table(
             [
               pick(bi("Asal", "From")),
@@ -470,15 +474,15 @@ export function mount(root: HTMLElement): () => void {
             ],
             [
               ...langsung.map((r) => [
-                r.from,
-                r.label,
-                r.to,
+                nama(NAMA, r.from),
+                nama(NAMA, r.label),
+                nama(NAMA, r.to),
                 pick(bi("langsung", "direct")),
               ]),
               ...warisan.map((r) => [
-                r.from,
-                r.label,
-                r.to,
+                nama(NAMA, r.from),
+                nama(NAMA, r.label),
+                nama(NAMA, r.to),
                 pick(bi("warisan", "inherited")),
               ]),
             ],
@@ -487,8 +491,8 @@ export function mount(root: HTMLElement): () => void {
             class: "note",
             text: pick(
               bi(
-                `${langsung.length} sifat langsung, ${warisan.length} diwarisi dari ${view.ancestors.join(", ") || "—"}. Inilah gunanya jaringan semantik: menuliskan bahwa hewan punya sel satu kali sudah cukup untuk seluruh turunannya.`,
-                `${langsung.length} direct properties, ${warisan.length} inherited from ${view.ancestors.join(", ") || "—"}. This is the point of a semantic network: writing once that animals have cells covers every descendant.`,
+                `${langsung.length} sifat langsung, ${warisan.length} diwarisi dari ${view.ancestors.map((a) => nama(NAMA, a)).join(", ") || "—"}. Inilah gunanya jaringan semantik: menuliskan bahwa hewan punya sel satu kali sudah cukup untuk seluruh turunannya.`,
+                `${langsung.length} direct properties, ${warisan.length} inherited from ${view.ancestors.map((a) => nama(NAMA, a)).join(", ") || "—"}. This is the point of a semantic network: writing once that animals have cells covers every descendant.`,
               ),
             ),
           }),
@@ -655,7 +659,7 @@ export function mount(root: HTMLElement): () => void {
             pick(bi("Simpul", "Node")),
             buttonRow(
               nodes.map((n) => ({
-                label: n,
+                label: nama(NAMA, n),
                 selected: n === node,
                 onClick: () => {
                   node = n;

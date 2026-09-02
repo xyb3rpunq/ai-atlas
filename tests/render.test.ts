@@ -34,6 +34,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import * as engine from "../web/src/engine.js";
 import { setLang } from "../web/src/i18n.js";
+import { NAMA as NAMA_PAKAR } from "../web/src/labs/expert.js";
+import { NAMA as NAMA_PENGETAHUAN } from "../web/src/labs/knowledge.js";
 import { LABS } from "../web/src/labs/registry.js";
 
 const AKAR = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -239,6 +241,52 @@ describe("penandaan bahan yang dianalisis", () => {
       expect(semua).toContain("Indonesian");
     } finally {
       lepas();
+    }
+  });
+});
+
+describe("kunci mesin punya nama yang bisa dibaca", () => {
+  // Kunci yang tidak ada di kamus tampil apa adanya, dan itu memang perilaku
+  // yang benar untuk fakta yang diketik sendiri pengguna. Tetapi untuk data
+  // contoh yang datang dari mesin, tampil apa adanya berarti tampil dalam
+  // Bahasa Indonesia — di halaman yang seluruh sisanya berbahasa Inggris.
+  //
+  // Pemeriksaan bocoran berbasis kata fungsi tidak bisa melihatnya: "burung"
+  // dan "pinguin" kata benda, dan daftar kata fungsi sengaja tidak memuat kata
+  // benda supaya ia tidak berteriak pada nama peubah. Yang bisa melihatnya
+  // hanya pemeriksaan kelengkapan seperti ini.
+
+  it("seluruh gejala dan kesimpulan sistem pakar ada di kamusnya", () => {
+    const kb = engine.expertSampleKb();
+    const kunci = new Set<string>();
+    for (const r of kb.rules) {
+      kunci.add(r.conclusion);
+      for (const p of r.premises) kunci.add(p.fact);
+    }
+    for (const f of kb.askable) kunci.add(f);
+    for (const k of kunci) {
+      expect(Object.keys(NAMA_PAKAR), k).toContain(k);
+    }
+    // Dan sebaliknya: nama yang tidak dipakai adalah terjemahan yang dirawat
+    // tanpa satu pun layar yang menampilkannya.
+    for (const k of Object.keys(NAMA_PAKAR)) {
+      expect(kunci.has(k), k).toBe(true);
+    }
+  });
+
+  it("seluruh simpul dan relasi jaringan semantik ada di kamusnya", () => {
+    const view = engine.logicSemanticNetwork("pinguin");
+    const kunci = new Set<string>(view.nodes);
+    for (const r of view.relations) {
+      kunci.add(r.from);
+      kunci.add(r.label);
+      kunci.add(r.to);
+    }
+    for (const k of kunci) {
+      expect(Object.keys(NAMA_PENGETAHUAN), k).toContain(k);
+    }
+    for (const k of Object.keys(NAMA_PENGETAHUAN)) {
+      expect(kunci.has(k), k).toBe(true);
     }
   });
 });

@@ -111,7 +111,7 @@ function grafInferensi(
  * rantai penalarannya — aturan yang menyimpulkan "fever" tidak akan pernah
  * menyalakan aturan yang menuntut "demam".
  */
-const NAMA: KamusNama = {
+export const NAMA: KamusNama = {
   demam: bi("demam", "fever"),
   "demam tinggi": bi("demam tinggi", "high fever"),
   pilek: bi("pilek", "runny nose"),
