@@ -15,9 +15,32 @@ Empat belas algoritma AI klasik, ditulis dari nol dengan **Rust**, dijalankan di
 [![WASM](https://img.shields.io/badge/WebAssembly-56%20KB%20gzip-654ff0)](https://webassembly.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
+[🇮🇩 Bahasa Indonesia](#-bahasa-indonesia) · [🇬🇧 English](#-english)
+
 </div>
 
 ---
+
+## 🇮🇩 Bahasa Indonesia
+
+### Ini apa, sih?
+
+Kalau kamu punya kalkulator, kamu percaya angkanya karena orang lain sudah
+memeriksanya berkali-kali. Tapi bagaimana kalau kalkulatornya baru, dan kamu
+sendiri yang membuatnya?
+
+Cara paling meyakinkan: **kerjakan soal yang sama dengan tiga cara berbeda,
+lalu bandingkan.** Kalau ketiganya sepakat sampai angka paling belakang,
+kemungkinan besar ketiganya benar. Kalau satu berbeda, kamu tahu ada yang salah
+— dan tahu di mana harus mencari.
+
+Itu yang dilakukan proyek ini. Empat belas algoritma kecerdasan buatan, masing-
+masing ditulis **tiga kali dalam tiga bahasa pemrograman berbeda** (Rust, Go,
+dan Oracle PL/SQL), lalu diadu satu sama lain secara otomatis. Kalau selisihnya
+sekecil apa pun, buildnya gagal dan situsnya tidak terbit.
+
+Kamu bisa geser penggesernya sendiri di situs itu. Yang menghitung adalah kode
+Rust yang berjalan di dalam tab kamu — bukan server siapa pun.
 
 ## Apa ini
 
@@ -365,5 +388,117 @@ Dibangun oleh **[Daniel Hutajulu](https://github.com/xyb3rpunq)** — `.Deckyx`
 [xyb3rpunq.github.io/whoami](https://xyb3rpunq.github.io/whoami/)
 
 `.Deckyx` — inisial pencipta, tertanam di setiap repo, produk, dan proyek.
+
+</div>
+
+---
+
+## 🇬🇧 English
+
+### What is this?
+
+You trust a pocket calculator because other people have checked it many times
+over. But what if the calculator is new, and you built it yourself?
+
+The most convincing approach: **work the same problem three different ways and
+compare.** If all three agree down to the last digit, they are very probably
+right. If one differs, you know something is wrong — and you know where to
+look.
+
+That is what this project does. Fourteen classical AI algorithms, each written
+**three times in three different languages** (Rust, Go, and Oracle PL/SQL),
+then checked against one another automatically. Any discrepancy at all fails
+the build, and the site does not ship.
+
+You can move the sliders yourself. The computation is Rust compiled to
+WebAssembly, running inside your own tab — not on anyone's server.
+
+### Why this architecture
+
+A wrong formula does not crash the program. It quietly produces plausible wrong
+numbers — the most dangerous failure mode in numerical software. The only real
+defence is to **write the same algorithm more than once, independently, and
+compare the results.**
+
+```
+                       ┌──────────────────────────────┐
+                       │  crates/ai-core   (Rust)     │
+                       │  source of truth             │
+                       │  pure · no I/O · tested      │
+                       └───────────────┬──────────────┘
+              ┌────────────────────────┼────────────────────────┐
+   ┌──────────▼─────────┐  ┌───────────▼──────────┐  ┌──────────▼──────────┐
+   │  crates/ai-wasm    │  │  tools/conform (Go)  │  │  oracle/ (PL/SQL)   │
+   │  → browser         │  │  2nd implementation  │  │  3rd implementation │
+   └────────────────────┘  └───────────┬──────────┘  └──────────┬──────────┘
+                                       └───── compare ──────────┘
+                                  2,266 vectors → 3,796 assertions
+                                  a 1 ULP difference fails the build
+```
+
+Numbers cross language boundaries as **16-digit hexadecimal bit patterns**,
+never as decimal. That is not pedantry: measurement found
+`serde_json::from_str::<f64>` mis-rounding by 1 ULP on **27,548 of 200,000**
+test values (13.8%), while Rust's own `str::parse::<f64>` had zero errors.
+
+### Three findings worth knowing
+
+1. **IEEE-754 only requires `+ − × ÷ √` and comparison to be correctly
+   rounded.** `exp`, `ln`, `log2`, `tanh`, and `pow` are not covered. One
+   neural-network test passed on Windows and failed on Linux for exactly this
+   reason.
+
+2. **Oracle `BINARY_DOUBLE` has no negative zero.** Even
+   `UTL_RAW.CAST_TO_BINARY_DOUBLE(HEXTORAW('8000000000000000'))` returns `+0`.
+   44 of 3,796 assertions are affected, handled by a distinct `Z` verdict that
+   applies only when both values are genuinely zero — and locked by a test.
+
+3. **Subtracting two nearly equal quantities amplifies error.** Information
+   gain is `H(before) − H(after)`; a 2 ULP error in `H` (≈ 0.94) becomes 64 ULP
+   in the result (≈ 0.029). This produced a fourth comparability tier,
+   `CancellingDifference(n)`, which measures tolerance at the **input** scale:
+   `|a − b| ≤ n × ulp(scale)`.
+
+### Visualisation in every module
+
+Every lab carries figures built from a shared SVG toolkit — `numberLine`,
+`waterfall`, `nodeGraph`, `heatmap`, `pipeline`, `rankedBars`, `cycle` — and
+`figure()` **requires** a caption, which becomes the `aria-label`. A figure
+without an explanation only helps readers who already understand it, and the
+readers who most need a figure are precisely those who do not.
+
+SVG is used for structure; canvas only where hundreds of pixels mean something
+solely in aggregate. Canvas is invisible to screen readers, must be redrawn on
+every theme change, and has to manage `devicePixelRatio` by hand.
+
+### Bilingual by construction
+
+Every user-visible string is a `Bilingual` value — `bi("Indonesian",
+"English")` — so a missing translation is a **type error**, not a string that
+silently falls back to the wrong language. The chosen language persists in
+`localStorage` and sets `document.documentElement.lang`.
+
+### Running it
+
+```bash
+npm install
+npm run wasm       # build the Rust → WebAssembly bundle
+npm run dev
+npm run audit:all  # Rust tests, web tests, typecheck, build, budget
+```
+
+Requires Rust 1.75+, Node 22+, and `wasm-pack`. The Oracle implementation runs
+under Docker; see `oracle/run.sh`.
+
+---
+
+<div align="center">
+
+**Bagian dari empat situs IND323** · *Part of the four IND323 sites*
+
+**ai-atlas** (Rust → WASM) ·
+[kecerdasan-buatan](https://xyb3rpunq.github.io/kecerdasan-buatan/) (Lua) ·
+[ind323-ai-lab](https://xyb3rpunq.github.io/ind323-ai-lab/) (Swift) ·
+[neuronusa](https://xyb3rpunq.github.io/neuronusa/) (Brython)
 
 </div>
