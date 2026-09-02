@@ -344,7 +344,7 @@ export function mount(root: HTMLElement): () => void {
           buttonRow(
             (["spiral", "xor", "and", "or"] as DatasetName[]).map((name) => ({
               label: name.toUpperCase(),
-              primary: name === datasetName,
+              selected: name === datasetName,
               onClick: () => {
                 datasetName = name;
                 rebuild();
@@ -380,7 +380,7 @@ export function mount(root: HTMLElement): () => void {
           buttonRow(
             ARCHITECTURES.map((a) => ({
               label: a.label,
-              primary: a.hidden.join("-") === hidden.join("-"),
+              selected: a.hidden.join("-") === hidden.join("-"),
               onClick: () => {
                 hidden = [...a.hidden];
                 rebuild();

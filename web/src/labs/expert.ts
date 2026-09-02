@@ -295,7 +295,7 @@ export function mount(root: HTMLElement): () => void {
           buttonRow(
             inspection.derivable.map((f) => ({
               label: f,
-              primary: f === goal,
+              selected: f === goal,
               onClick: () => {
                 goal = f;
                 render();

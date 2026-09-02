@@ -272,9 +272,18 @@ export function mount(root: HTMLElement): () => void {
       );
 
       const rows = evidence.map((item, index) =>
-        el("div", {
-          class: "card",
-          children: [
+        // Kartu bernomor, bukan `<div class="card">` biasa: nomornya yang
+        // mengelompokkan MB dan MD milik bukti yang sama di laporan ekspor.
+        // Tanpa itu, tiga bukti menghasilkan tiga pasang "MB" dan "MD"
+        // berturut-turut tanpa satu pun petunjuk pasangan mana milik siapa.
+        //
+        // Bernomor dan bukan bernama: namanya diketik pengguna dan berubah
+        // tanpa panel ini digambar ulang, sehingga judul bernama akan basi
+        // sejak huruf pertama diketik. Namanya sendiri tetap masuk laporan,
+        // lewat isian teks di dalam kartu ini.
+        card(
+          `${pick(T.evidence)} ${index + 1}`,
+          ...[
             el("div", {
               class: "field",
               children: [
@@ -328,7 +337,7 @@ export function mount(root: HTMLElement): () => void {
               },
             ]),
           ],
-        }),
+        ),
       );
 
       controls.append(

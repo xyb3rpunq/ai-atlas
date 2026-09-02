@@ -586,7 +586,7 @@ export function mount(root: HTMLElement): () => void {
           ] as [Tab, { id: string; en: string }][]
         ).map(([t, label]) => ({
           label: pick(label),
-          primary: t === tab,
+          selected: t === tab,
           onClick: () => {
             tab = t;
             renderControls();
@@ -616,7 +616,7 @@ export function mount(root: HTMLElement): () => void {
             buttonRow(
               (["euclidean", "manhattan", "chebyshev"] as engine.Distance[]).map((d) => ({
                 label: d,
-                primary: d === distance,
+                selected: d === distance,
                 onClick: () => {
                   distance = d;
                   renderControls();
@@ -751,7 +751,7 @@ export function mount(root: HTMLElement): () => void {
             : buttonRow(
                 CLASSES.map((c) => ({
                   label: `${pick(bi("Kelas", "Class"))} ${c}`,
-                  primary: c === brush,
+                  selected: c === brush,
                   onClick: () => {
                     brush = c;
                     renderControls();

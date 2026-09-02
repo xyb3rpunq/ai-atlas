@@ -115,8 +115,6 @@ Perilaku Oracle itu sendiri dikunci uji, supaya kelonggarannya bisa dicabut kala
 
 ### Catatan teknis: kenapa pola bit, bukan desimal
 
-### Catatan teknis: kenapa pola bit, bukan desimal
-
 Saat membangun harness ini, pengukuran menemukan bahwa `serde_json::from_str::<f64>` **salah membulat sebesar 1 ULP pada 27.548 dari 200.000 nilai uji (13,8%)**, sementara `str::parse::<f64>` bawaan Rust nol kesalahan pada himpunan yang sama. Menulis `0.42000000000000004` lalu membacanya kembali bisa menghasilkan `0.42` — angka yang berbeda.
 
 Karena itu seluruh vektor uji lintas bahasa memakai **16 digit heksadesimal pola bit**, bukan desimal. Lihat [`crates/ai-core/src/fx.rs`](crates/ai-core/src/fx.rs) dan uji `serde_json_bisa_meleset_satu_ulp` yang memagari temuan ini.
@@ -158,6 +156,23 @@ Setiap laboratorium menampilkan besarannya sebagai gambar, bukan hanya tabel. Ya
 **Gambar struktural memakai SVG, bukan kanvas.** Bukan selera: kanvas tidak terlihat oleh pembaca layar, harus digambar ulang tiap kali tema berganti, dan harus mengurus `devicePixelRatio` sendiri. SVG mewarisi warna lewat variabel CSS, sehingga pergantian terang-gelap tidak memerlukan satu baris kode pun. Kanvas tetap dipakai di tempat yang memang membutuhkannya — peta penelusuran yang menggambar ribuan petak tiap bingkai.
 
 **Setiap gambar wajib punya padanan teks.** Fungsi `figure()` menuntut argumen `summary`, dan keterangannya menjadi `aria-label` gambar sekaligus tulisan di bawahnya. Keterangannya bukan pengulangan judul: ia menyebutkan apa yang sedang dilihat dan apa artinya, sebab pembaca yang paling butuh gambar adalah yang belum memahami topiknya.
+
+## Data Anda sendiri, hasilnya bisa dibawa pulang
+
+Tiap laboratorium menerima data yang Anda ketik sendiri — bukan hanya contoh bawaan. Isi bukti dan bobotnya di Certainty Factor, tempel kalimat Anda di NLP, tulis rumus Anda di representasi pengetahuan, gambar dinding Anda di peta pencarian. Seluruhnya dihitung di peramban Anda; tidak ada satu bita pun yang dikirim ke mana pun.
+
+Di ujung tiap laboratorium ada dua tombol:
+
+| Tombol | Menghasilkan | Untuk |
+|---|---|---|
+| **Unduh CSV (Excel)** | Satu berkas berisi setelan, hasil, langkah perhitungan, dan seluruh tabel di halaman | Diolah lagi di Excel, Google Sheets, atau pandas |
+| **Cetak / simpan PDF** | Halaman yang sama tanpa kemudi, satu kolom, tabel utuh | Dilampirkan ke laporan tugas |
+
+Laporannya mengikuti struktur halaman: tiap kartu menjadi satu bagian bernama, sehingga sebuah berkas berisi lima tabel tetap bisa dibaca ulang besok. Pilihan yang sedang aktif — algoritma mana, heuristik mana, mesin inferensi mana — ikut tercatat, karena angka tanpa setelan yang menghasilkannya tidak bisa diulang siapa pun.
+
+**Kenapa CSV dan bukan XLSX.** XLSX adalah arsip ZIP berisi beberapa berkas XML; menyusunnya di peramban menuntut pustaka ratusan kilobyte — beberapa kali lipat modul WebAssembly seluruh proyek ini. CSV dibuka Excel, Sheets, dan pandas tanpa satu bita pun tambahan. Tiga hal yang membuatnya sungguh terbuka rapi, dan ketiganya sering terlewat: BOM UTF-8 di depan, baris `sep=,` paling atas (Excel berwilayah Indonesia memakai titik koma), dan akhir baris CRLF sesuai RFC 4180.
+
+**Kenapa isinya dibaca dari tampilan.** Dua belas laboratorium tidak punya satu bentuk hasil bersama. Menambahkan ekspor satu per satu berarti dua belas potong kode yang akan menyimpang — yang satu lupa langkah, yang lain lupa masukan, dan tidak ada yang menyadarinya sampai seseorang mengunduh lab yang jarang dibuka. Karena itu isinya dipungut dari atribut `data-ekspor` yang dipasang komponen bersama di [`web/src/ui.ts`](web/src/ui.ts). Sebuah laboratorium yang memakai komponen bersama otomatis bisa diekspor tanpa satu baris pun tambahan. Lihat [`web/src/ekspor.ts`](web/src/ekspor.ts) dan [`tests/ekspor.test.ts`](tests/ekspor.test.ts) — ujinya dibangun dari komponen sungguhan, bukan HTML tiruan, supaya kontraknya yang putus terdeteksi, bukan hanya tiruannya.
 
 ## Peta silabus
 
@@ -261,9 +276,10 @@ Setiap fungsi publik punya uji. Bukan uji jalur bahagia saja — uji nilai batas
 | `web/src/viz.ts` | 11 | 42 |
 | `web/src/labs/notes.ts` | 1 | 54 |
 | `web/src/labs/registry.ts` | 2 | 21 |
+| `web/src/ekspor.ts` | 7 | 29 |
 | `tools/conform` (Go) | 23 | 12 |
 | `oracle/` (PL/SQL) | 27 | 60 |
-| **Total** | **406** | **759** |
+| **Total** | **413** | **788** |
 
 Ditambah **3.796 pernyataan konformansi** yang mengadu ketiga implementasi terhadap vektor yang sama. Angka itu bukan bagian dari 759 di atas: uji unit membuktikan tiap implementasi konsisten dengan dirinya sendiri, sedangkan konformansi membuktikan ketiganya sepakat satu sama lain — dan hanya yang kedua yang bisa menangkap rumus yang salah tetapi konsisten.
 
@@ -279,6 +295,12 @@ Beberapa uji yang menahan seluruh proyek ini tetap jujur:
   keluaran. Uji inilah yang menemukan bug himpunan bahu.
 - **Reproduktifitas** — benih yang sama harus menghasilkan bobot, labirin, dan
   jejak pencarian yang identik bit demi bit.
+- **Laporan ekspor dibangun dari komponen sungguhan** — ujinya menyusun kartu,
+  penggeser, dan tabel lewat `ui.ts` yang sama seperti yang dipakai
+  laboratorium, lalu memeriksa hasil bacaannya. Kalau suatu hari sebuah
+  komponen ditata ulang dan atribut `data-ekspor`-nya hilang, situsnya tetap
+  jalan dan tombol unduhnya tetap bekerja — berkasnya hanya kehilangan satu
+  blok, diam-diam. Uji inilah satu-satunya yang menangkapnya.
 - **Setiap gambar punya padanan teks** — `figure()` menuntut keterangan, dan
   ujinya memeriksa bahwa keterangan itu benar-benar sampai ke `aria-label`.
   Gambar tanpa keterangan adalah kotak kosong bagi pengguna pembaca layar, dan
@@ -470,6 +492,37 @@ readers who most need a figure are precisely those who do not.
 SVG is used for structure; canvas only where hundreds of pixels mean something
 solely in aggregate. Canvas is invisible to screen readers, must be redrawn on
 every theme change, and has to manage `devicePixelRatio` by hand.
+
+### Your own data, and results you can take with you
+
+Every lab accepts data you type yourself, not just the built-in examples: your
+evidence and weights in Certainty Factor, your sentence in NLP, your formula in
+knowledge representation, your walls on the search map. All of it is computed
+in your browser — not one byte leaves the machine.
+
+Each lab ends with two buttons. **Download CSV (Excel)** writes one file
+containing the settings, the results, the calculation steps, and every table on
+the page. **Print / save as PDF** gives you the same page without the chrome:
+one column, tables intact, ready to staple to an assignment.
+
+The report follows the page: each card becomes one named section, so a file
+holding five tables is still readable tomorrow. The active selections —
+which algorithm, which heuristic, which inference engine — are recorded too,
+because a number without the settings that produced it cannot be reproduced by
+anyone.
+
+CSV rather than XLSX: XLSX is a ZIP of XML files, and writing one in the
+browser costs a library several times the size of this project's entire
+WebAssembly module. Three details make CSV actually open cleanly in Excel, and
+all three are commonly missed — a UTF-8 BOM, a leading `sep=,` line for
+locales that use semicolons, and CRLF line endings per RFC 4180.
+
+The content is read from the rendered page via `data-ekspor` attributes set by
+the shared components in [`web/src/ui.ts`](web/src/ui.ts), rather than
+implemented twelve times. A lab built from shared components is exportable with
+no extra code; see [`web/src/ekspor.ts`](web/src/ekspor.ts) and
+[`tests/ekspor.test.ts`](tests/ekspor.test.ts), whose tests are built from the
+real components so that a broken contract fails the suite.
 
 ### Bilingual by construction
 

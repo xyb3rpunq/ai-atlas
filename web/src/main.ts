@@ -12,6 +12,7 @@ import * as engine from "./engine.js";
 import { T, lang, onLangChange, pick, restoreLang, setLang } from "./i18n.js";
 import { LABS, SYLLABUS, findLab, type Lab } from "./labs/registry.js";
 import { notesFor } from "./labs/notes.js";
+import { LABEL as EKSPOR_LABEL, bacaIsi, csv, download, fileName, reportRows } from "./ekspor";
 import { clear, el } from "./ui.js";
 
 const THEME_KEY = "ai-atlas:theme";
@@ -332,6 +333,7 @@ function labPage(lab: Lab): HTMLElement {
         ],
       }),
       body,
+      exportSection(lab, body),
       notesSection(lab.slug),
     ],
   });
@@ -357,6 +359,64 @@ function labPage(lab: Lab): HTMLElement {
     });
 
   return page;
+}
+
+/**
+ * Bagian ekspor di ujung tiap lab.
+ *
+ * Isinya dibaca dari `body` yang sudah tergambar, bukan dari keadaan lab.
+ * Keempat belas lab tidak punya bentuk hasil bersama, dan membaca tampilannya
+ * membuat satu kode ini berlaku untuk semuanya — termasuk lab yang belum ada.
+ */
+function exportSection(lab: Lab, body: HTMLElement): HTMLElement {
+  const kabar = el("div", { class: "ekspor__kabar", attrs: { "aria-live": "polite" } });
+
+  const tombolUnduh = el("button", {
+    class: "btn",
+    attrs: { type: "button" },
+    text: pick(EKSPOR_LABEL.download),
+    on: {
+      click: () => {
+        clear(kabar);
+        try {
+          const nama = fileName(lab.slug);
+          const isi = bacaIsi(body);
+          download(nama, csv(reportRows(pick(lab.title), lab.session, isi)), "text/csv;charset=utf-8");
+          kabar.append(
+            el("span", {
+              class: "kabar kabar--ok",
+              text: `${pick(EKSPOR_LABEL.downloaded)}: ${nama}`,
+            }),
+          );
+        } catch (error: unknown) {
+          // Diam bukan pilihan: pengguna yang menekan tombol dan tidak melihat
+          // apa pun akan menekannya lagi, lalu menyimpulkan situsnya rusak.
+          kabar.append(
+            el("span", {
+              class: "kabar",
+              text: `${pick(EKSPOR_LABEL.refused)}: ${(error as Error).message}`,
+            }),
+          );
+        }
+      },
+    },
+  });
+
+  const tombolCetak = el("button", {
+    class: "btn",
+    attrs: { type: "button" },
+    text: pick(EKSPOR_LABEL.print),
+    on: { click: () => globalThis.print() },
+  });
+
+  return el("section", {
+    class: "ekspor",
+    children: [
+      el("p", { class: "note", text: pick(EKSPOR_LABEL.hint) }),
+      el("div", { class: "btn-row", children: [tombolUnduh, tombolCetak] }),
+      kabar,
+    ],
+  });
 }
 
 /** Halaman untuk alamat yang tidak dikenal. */

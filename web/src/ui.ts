@@ -115,6 +115,11 @@ export function slider(options: SliderOptions): HTMLElement {
   });
   return el("label", {
     class: "field",
+    // Ditandai sebagai masukan yang bisa diekspor. Nilainya dibaca dari
+    // `input` saat ekspor dijalankan, bukan disalin ke atribut di sini —
+    // menyalinnya berarti dua tempat yang harus dijaga tetap sepadan, dan
+    // yang tertinggal adalah salinan yang tidak pernah dilihat siapa pun.
+    attrs: { "data-ekspor": "masukan", "data-label": options.label },
     children: [
       el("span", {
         class: "field__label",
@@ -137,6 +142,10 @@ export function card(
 ): HTMLElement {
   return el("section", {
     class: "card",
+    // Judulnya ikut ditandai supaya laporan ekspor mengikuti struktur
+    // halaman. Tanpa itu, sebuah CSV yang memuat lima tabel tidak memberi
+    // satu pun petunjuk tabel mana yang mana.
+    attrs: title ? { "data-ekspor": "kartu", "data-judul": title } : {},
     children: [
       title ? el("h2", { class: "card__title", text: title }) : null,
       ...children,
@@ -147,6 +156,7 @@ export function card(
 /** Angka besar dengan keterangan di bawahnya. */
 export function readout(label: string, value: string): HTMLElement {
   return el("div", {
+    attrs: { "data-ekspor": "hasil", "data-label": label, "data-nilai": value },
     children: [
       el("div", { class: "readout", text: value }),
       el("div", { class: "readout__label", text: label }),
@@ -167,8 +177,10 @@ export function bar(fraction: number, tone: "" | "warn" | "danger" = ""): HTMLEl
 export function stepList(steps: { label: string; formula: string }[]): HTMLElement {
   return el("ol", {
     class: "steps",
+    attrs: { "data-ekspor": "langkah" },
     children: steps.map((s) =>
       el("li", {
+        attrs: { "data-label": s.label, "data-rumus": s.formula },
         children: [
           el("div", {
             children: [
@@ -224,17 +236,48 @@ export function table(head: string[], rows: (string | number)[][]): HTMLElement 
   });
 }
 
-/** Baris tombol. */
-export function buttonRow(
-  buttons: { label: string; primary?: boolean; onClick: () => void }[],
-): HTMLElement {
+/** Satu tombol pada sebuah baris tombol. */
+export interface Tombol {
+  label: string;
+  /** Penekanan visual. Dipakai untuk aksi utama sebuah panel. */
+  primary?: boolean;
+  /**
+   * Menyatakan bahwa tombol ini bagian dari sekelompok pilihan, dan apakah
+   * ia yang sedang terpilih.
+   *
+   * Sengaja dipisah dari {@link primary}. Keduanya kebetulan tampak sama,
+   * tetapi artinya berbeda: "Tambah bukti" ditonjolkan karena ia aksi utama,
+   * bukan karena ia sedang terpilih. Menyamakannya membuat pembaca layar
+   * mengumumkan tombol aksi sebagai tombol yang sedang aktif, dan membuat
+   * laporan ekspor mencatat "dipilih: Tambah bukti" — kalimat yang tidak
+   * berarti apa-apa bagi yang membacanya besok.
+   */
+  selected?: boolean;
+  onClick: () => void;
+}
+
+/** Baris tombol; bisa berupa sekelompok pilihan atau sederet aksi. */
+export function buttonRow(buttons: Tombol[]): HTMLElement {
+  const kelompokPilihan = buttons.some((b) => b.selected !== undefined);
   return el("div", {
     class: "btn-row",
+    // Hanya kelompok pilihan yang masuk laporan: yang terpilih adalah bagian
+    // dari setelan yang menghasilkan angkanya, dan laporan tanpa itu tidak
+    // bisa diulang siapa pun. Sederet aksi tidak punya "nilai" untuk dicatat.
+    attrs: kelompokPilihan
+      ? { "data-ekspor": "pilihan", role: "group" }
+      : {},
     children: buttons.map((b) =>
       el("button", {
-        class: b.primary ? "btn btn--primary" : "btn",
+        class: (b.selected ?? b.primary) ? "btn btn--primary" : "btn",
         text: b.label,
-        attrs: { type: "button" },
+        attrs: {
+          type: "button",
+          // Ditulis sebagai `aria-pressed`, bukan sekadar nama kelas: pembaca
+          // layar perlu tahu tombol mana yang sedang aktif, dan pengekspor
+          // membacanya dari sumber yang sama alih-alih menebak dari gaya.
+          "aria-pressed": b.selected === undefined ? null : String(b.selected),
+        },
         on: { click: b.onClick },
       }),
     ),

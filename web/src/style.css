@@ -878,3 +878,158 @@ canvas {
     max-width: none;
   }
 }
+
+
+/* ------------------------------------------------------------------------ */
+/* Ekspor                                                                    */
+/* ------------------------------------------------------------------------ */
+
+.ekspor {
+  margin-top: 2rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--line);
+}
+
+.ekspor__kabar {
+  min-height: 1.4rem;
+  margin-top: 0.5rem;
+}
+
+.kabar {
+  font-size: 0.84rem;
+  color: var(--ink-3);
+}
+
+.kabar--ok {
+  color: var(--ok, var(--accent));
+}
+
+/* ------------------------------------------------------------------------ */
+/* Cetak                                                                     */
+/* ------------------------------------------------------------------------ */
+/*
+ * Dialog cetak peramban juga yang menghasilkan PDF-nya, jadi aturan di bawah
+ * menentukan bentuk berkas PDF yang disimpan pengguna — bukan sekadar bentuk
+ * kertas yang jarang dipakai siapa pun.
+ */
+@media print {
+  /* Yang dibuang hanyalah kemudi. Yang tersisa adalah setelan, angka, dan
+     tabelnya — persis yang dibawa mahasiswa ke ruang asistensi. */
+  .site-head,
+  .footer,
+  .skip,
+  .sidebar,
+  .ekspor,
+  nav,
+  .lab-nav {
+    display: none !important;
+  }
+
+  /* Sederet aksi tidak berarti apa-apa di atas kertas: tidak ada yang bisa
+     menekannya. Sekelompok pilihan justru sebaliknya — pilihan yang sedang
+     aktif adalah bagian dari setelan yang menghasilkan angka di bawahnya, dan
+     lembar tanpa itu tidak bisa diulang siapa pun. */
+  .btn-row {
+    display: none !important;
+  }
+
+  .btn-row[data-ekspor="pilihan"] {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  .btn-row[data-ekspor="pilihan"] .btn {
+    display: inline-block !important;
+    background: #fff;
+    border: 1px solid #ccc;
+    color: #777;
+    padding: 0.1rem 0.4rem;
+    font-size: 9pt;
+  }
+
+  /* Ditandai dengan centang, bukan hanya dengan warna: lembar ini akan
+     dicetak hitam-putih, dan warna adalah yang pertama hilang. */
+  .btn-row[data-ekspor="pilihan"] .btn[aria-pressed="true"] {
+    border-color: #000;
+    color: #000;
+    font-weight: 700;
+  }
+
+  .btn-row[data-ekspor="pilihan"] .btn[aria-pressed="true"]::before {
+    content: "¹3 a0";
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+    font-size: 10pt;
+  }
+
+  .shell,
+  .main {
+    display: block;
+    max-width: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .lab-head h1 {
+    font-size: 16pt;
+  }
+
+  .card {
+    background: #fff;
+    border: 1px solid #bbb;
+    box-shadow: none;
+    /* Judul di satu halaman dan angkanya di halaman berikutnya adalah laporan
+       yang lebih sulit dibaca daripada laporan tanpa halaman sama sekali. */
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 0.6rem;
+  }
+
+  /* Kolom kendali dan hasil berdampingan di layar. Nama kelasnya `grid-2`,
+     dan sebelumnya blok ini menyebut tiga nama kelas yang tidak ada satu pun
+     di berkas ini — sehingga tiap cetakan keluar dua kolom sempit tanpa ada
+     yang menyadari aturannya tidak pernah berlaku. */
+  .grid-2 {
+    display: block !important;
+  }
+
+  table {
+    font-size: 9pt;
+  }
+
+  /* Tabel panjang yang terpotong halaman kehilangan kepala kolomnya, dan
+     angka tanpa nama kolom tidak berarti apa-apa. */
+  thead {
+    display: table-header-group;
+  }
+
+  tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Bidang bergulir di layar; di atas kertas tidak ada yang bisa menggulir,
+     jadi isinya dibiarkan melebar dan mengecil sendiri. */
+  .scroll-x {
+    overflow: visible !important;
+  }
+
+  svg,
+  canvas,
+  img {
+    max-width: 100%;
+    height: auto;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 8pt;
+    color: #555;
+  }
+}

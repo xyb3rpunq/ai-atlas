@@ -327,7 +327,7 @@ export function mount(root: HTMLElement): () => void {
           buttonRow(
             ALGORITHMS.map((a) => ({
               label: a.label,
-              primary: a.slug === algorithm,
+              selected: a.slug === algorithm,
               onClick: () => {
                 algorithm = a.slug;
                 renderControls();
@@ -341,7 +341,7 @@ export function mount(root: HTMLElement): () => void {
           buttonRow(
             HEURISTICS.map((h) => ({
               label: h,
-              primary: h === heuristic,
+              selected: h === heuristic,
               onClick: () => {
                 heuristic = h;
                 renderControls();
@@ -371,7 +371,7 @@ export function mount(root: HTMLElement): () => void {
               ] as [Tool, { id: string; en: string }][]
             ).map(([t, label]) => ({
               label: pick(label),
-              primary: t === tool,
+              selected: t === tool,
               onClick: () => {
                 tool = t;
                 renderControls();

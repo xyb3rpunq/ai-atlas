@@ -420,7 +420,7 @@ export function mount(root: HTMLElement): () => void {
       const engineButtons = buttonRow(
         (["mamdani", "sugeno", "tsukamoto"] as EngineName[]).map((name) => ({
           label: name,
-          primary: name === engineName,
+          selected: name === engineName,
           onClick: () => {
             engineName = name;
             renderControls();
@@ -432,7 +432,7 @@ export function mount(root: HTMLElement): () => void {
       const methodButtons = buttonRow(
         METHODS.map((m) => ({
           label: m.replaceAll("_", " "),
-          primary: m === method,
+          selected: m === method,
           onClick: () => {
             method = m;
             renderControls();

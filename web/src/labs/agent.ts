@@ -567,7 +567,7 @@ export function mount(root: HTMLElement): () => void {
           ] as [Tab, { id: string; en: string }][]
         ).map(([t, label]) => ({
           label: pick(label),
-          primary: t === tab,
+          selected: t === tab,
           onClick: () => {
             tab = t;
             renderControls();
@@ -585,7 +585,7 @@ export function mount(root: HTMLElement): () => void {
             buttonRow(
               dirty.map((d, i) => ({
                 label: `${i}${d ? " ●" : " ○"}`,
-                primary: i === position,
+                selected: i === position,
                 onClick: () => {
                   dirty[i] = !dirty[i];
                   renderControls();
