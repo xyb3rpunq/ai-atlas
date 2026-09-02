@@ -7,7 +7,45 @@ penomoran mengikuti [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Belum dirilis]
 
+### Diubah
+- **Kalimat aturan tidak lagi dirakit di mesinnya.** `RuleTrace` kabur dan
+  `Step` pakar dulu mengembalikan kalimat jadi berbahasa Indonesia — "JIKA
+  Pelayanan = Buruk ATAU …", "JIKA demam DAN pilek MAKA flu" — sehingga
+  halaman berbahasa Inggris menampilkannya apa adanya, dan tidak ada yang bisa
+  dilakukan sisi antarmuka tentang itu. Keduanya kini mengembalikan **bentuk**
+  aturannya, dan kalimatnya dirakit di `web/src/aturan.ts` dalam bahasa
+  pembacanya.
+- Nama gejala, variabel, dan himpunan tetap menjadi kunci di dalam mesin —
+  menerjemahkannya di sana akan memutus rantai penalarannya — dan nama yang
+  dibaca manusia diambil dari kamus saat ditampilkan.
+- `rationale` dibuang dari basis pengetahuan. Ia satu-satunya bidangnya yang
+  berupa kalimat untuk dibaca manusia, dan kalimat yang disimpan di mesin hanya
+  bisa punya satu bahasa. Alasan pakar kini tersimpan sisi antarmuka, berkunci
+  `id` aturan, dalam kedua bahasa.
+- `expert_why` dan `expert_how` dihapus dari jembatan WebAssembly. Keduanya
+  hanya merangkai kata dari data yang tidak pernah meninggalkan halaman, jadi
+  keduanya kini dirakit di TypeScript — satu perjalanan bolak-balik lebih
+  sedikit, dan dua bahasa alih-alih satu.
+
 ### Ditambahkan
+- **Naskah ELIZA berbahasa Inggris**, mengikuti DOCTOR asli Weizenbaum: sebelas
+  aturan dengan keutamaan yang sepadan dengan naskah Indonesia, tabel penukaran
+  kata ganti tersendiri, dan balasan cadangannya sendiri. Mesinnya tidak
+  berubah sama sekali — dan itu justru yang diperlihatkan laboratorium ini:
+  seluruh "kecerdasan" ELIZA ada di dalam datanya.
+- Jawaban **"bagaimana"** pada laboratorium sistem pakar: dari mana sebuah
+  kesimpulan datang, satu baris per langkah. Sebuah kesimpulan bisa datang
+  lewat lebih dari satu aturan, dan hanya jawaban ini yang memperlihatkannya.
+- **Uji yang benar-benar memasang tiap laboratorium**, lalu membaca layarnya
+  dalam Bahasa Inggris dan menolak kata Indonesia yang tersisa — termasuk pada
+  atribut yang dibaca manusia. Mesin WebAssembly-nya benar-benar dijalankan,
+  karena sebagian besar teks laboratorium baru muncul sesudah ada hasil, dan
+  halaman yang hampir kosong lolos setiap pemeriksaan bocoran.
+- Penandaan `data-korpus` untuk bahan yang memang berbahasa Indonesia dengan
+  sengaja — kalimat contoh di laboratorium pengolahan bahasa, yang morfologi
+  Indonesianya justru sedang dibedah. Ditandai di tempatnya, bukan dikecualikan
+  berdasarkan nama laboratorium, sehingga bagian lain mana pun tetap dituntut
+  diterjemahkan. Alasannya juga dinyatakan di layar.
 - Sesi 9 — Jaringan Syaraf Tiruan. Perceptron satu lapis, jaringan berlapis
   dengan perambatan balik dan momentum, enam fungsi aktivasi, inisialisasi
   Xavier, dan empat kumpulan data (XOR, AND, OR, spiral). Batas keputusan

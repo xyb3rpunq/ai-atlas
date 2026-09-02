@@ -14,6 +14,7 @@
 
 import init, * as wasm from "../pkg/ai_wasm.js";
 import wasmUrl from "../pkg/ai_wasm_bg.wasm?url";
+import type { Lang } from "./i18n.js";
 
 /** Amplop hasil dari sisi Rust. */
 type Envelope<T> = { ok: T } | { err: string };
@@ -208,12 +209,22 @@ export interface FuzzySystem {
   rules: FuzzyRule[];
 }
 
-/** Jejak satu aturan setelah dievaluasi. */
+/**
+ * Jejak satu aturan setelah dievaluasi.
+ *
+ * Membawa **bentuk** aturannya, bukan kalimatnya. Kalimat yang dirakit mesin
+ * akan selalu berbahasa Indonesia, sedangkan yang membacanya belum tentu;
+ * merakitnya di sini membuat "JIKA … ATAU … MAKA …" dan "IF … OR … THEN …"
+ * berasal dari satu sumber yang sama. Lihat {@link kalimatAturanKabur}.
+ */
 export interface RuleTrace {
   index: number;
   degrees: number[];
   firing_strength: number;
-  text: string;
+  antecedents: Antecedent[];
+  connective: "AND" | "OR";
+  output: string;
+  consequent_set: string;
 }
 
 /** Hasil inferensi kabur. */
@@ -553,7 +564,9 @@ export interface KnowledgeBaseReport {
 export interface ExpertStep {
   order: number;
   rule_id: string;
-  text: string;
+  /** Premis aturan, apa adanya — termasuk premis yang dinegasikan. */
+  premises: ExpertPremise[];
+  connective: "AND" | "OR";
   conclusion: string;
   premise_certainty: number;
   conclusion_certainty: number;
@@ -630,22 +643,6 @@ export function expertBackward(
 ): BackwardResult {
   return unwrap<BackwardResult>(
     wasm.expert_backward(JSON.stringify(kb), JSON.stringify(facts), goal),
-  );
-}
-
-/** Jawaban atas pertanyaan "kenapa aturan ini ada". */
-export function expertWhy(kb: KnowledgeBase, ruleId: string): string {
-  return unwrap<string>(wasm.expert_why(JSON.stringify(kb), ruleId));
-}
-
-/** Jawaban atas pertanyaan "bagaimana kesimpulan ini diperoleh". */
-export function expertHow(
-  kb: KnowledgeBase,
-  facts: [string, number][],
-  fact: string,
-): string[] {
-  return unwrap<string[]>(
-    wasm.expert_how(JSON.stringify(kb), JSON.stringify(facts), fact),
   );
 }
 
@@ -1040,19 +1037,26 @@ export interface ElizaSummary {
   keywords: [string, number][];
 }
 
-/** Balasan ELIZA untuk sebuah masukan. */
-export function elizaRespond(input: string, seed: number): ElizaReply {
-  return unwrap<ElizaReply>(wasm.eliza_respond(input, BigInt(seed)));
+/**
+ * Balasan ELIZA untuk sebuah masukan, memakai naskah bahasa yang diminta.
+ *
+ * Bahasanya diteruskan ke mesin, bukan diterjemahkan sesudahnya, karena ELIZA
+ * mencocokkan **kata kunci**: "saya merasa" tidak akan pernah cocok dengan
+ * kalimat berbahasa Inggris, dan menerjemahkan balasannya sesudah dicocokkan
+ * berarti menerjemahkan jawaban atas kalimat yang tidak pernah dipahami.
+ */
+export function elizaRespond(input: string, seed: number, bahasa: Lang): ElizaReply {
+  return unwrap<ElizaReply>(wasm.eliza_respond(input, BigInt(seed), bahasa));
 }
 
-/** Ringkasan naskah ELIZA. */
-export function elizaScriptSummary(): ElizaSummary {
-  return unwrap<ElizaSummary>(wasm.eliza_script_summary());
+/** Ringkasan naskah ELIZA untuk sebuah bahasa. */
+export function elizaScriptSummary(bahasa: Lang): ElizaSummary {
+  return unwrap<ElizaSummary>(wasm.eliza_script_summary(bahasa));
 }
 
-/** Naskah ELIZA lengkap. */
-export function elizaScript(): ElizaScript {
-  return unwrap<ElizaScript>(wasm.eliza_script());
+/** Naskah ELIZA lengkap untuk sebuah bahasa. */
+export function elizaScript(bahasa: Lang): ElizaScript {
+  return unwrap<ElizaScript>(wasm.eliza_script(bahasa));
 }
 
 // ---------------------------------------------------------------------------

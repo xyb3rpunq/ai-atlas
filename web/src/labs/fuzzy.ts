@@ -9,8 +9,32 @@
  */
 
 import * as engine from "../engine.js";
+import { kalimatAturanKabur, nama } from "../aturan.js";
+import type { KamusNama } from "../aturan.js";
 import { T, bi, pick } from "../i18n.js";
 import { buttonRow, card, clear, el, errorNote, fmt, readout, slider, table } from "../ui.js";
+
+/**
+ * Nama yang dibaca manusia untuk variabel dan himpunan sistem contoh.
+ *
+ * Terpisah dari sistemnya karena di dalam mesin nama-nama itu **kunci**:
+ * "Pelayanan" di sebuah premis menunjuk variabel "Pelayanan" di daftar
+ * masukan. Menerjemahkannya di sana akan memutus hubungan itu, dan sistemnya
+ * berhenti bekerja dalam salah satu bahasa.
+ */
+const NAMA: KamusNama = {
+  Pelayanan: bi("Pelayanan", "Service"),
+  Makanan: bi("Makanan", "Food"),
+  Tip: bi("Tip", "Tip"),
+  Buruk: bi("Buruk", "Poor"),
+  Baik: bi("Baik", "Good"),
+  Istimewa: bi("Istimewa", "Excellent"),
+  Hambar: bi("Hambar", "Bland"),
+  Lezat: bi("Lezat", "Delicious"),
+  Sedikit: bi("Sedikit", "Small"),
+  Sedang: bi("Sedang", "Medium"),
+  Banyak: bi("Banyak", "Large"),
+};
 
 /** Sistem contoh: menentukan persen tip dari mutu pelayanan dan makanan. */
 const SYSTEM: engine.FuzzySystem = {
@@ -304,7 +328,7 @@ export function mount(root: HTMLElement): () => void {
         card(
           pick(T.result),
           readout(
-            `${SYSTEM.output.name} · ${engineName}${engineName === "mamdani" ? ` · ${method}` : ""}`,
+            `${nama(NAMA, SYSTEM.output.name)} · ${engineName}${engineName === "mamdani" ? ` · ${method}` : ""}`,
             fmt(result.crisp, 3),
           ),
           el("p", {
@@ -328,7 +352,7 @@ export function mount(root: HTMLElement): () => void {
             ],
             result.rules.map((r) => [
               String(r.index),
-              r.text,
+              kalimatAturanKabur(r, NAMA),
               r.degrees.map((d) => fmt(d, 3)).join(" · "),
               r.firing_strength,
             ]),
@@ -392,17 +416,17 @@ export function mount(root: HTMLElement): () => void {
             role: "img",
             "aria-label": pick(
               bi(
-                `Kurva keanggotaan variabel ${v.name}.`,
-                `Membership curves for ${v.name}.`,
+                `Kurva keanggotaan variabel ${nama(NAMA, v.name)}.`,
+                `Membership curves for ${nama(NAMA, v.name)}.`,
               ),
             ),
           },
         });
         inputCanvases.set(v.name, canvas);
         return card(
-          v.name,
+          nama(NAMA, v.name),
           slider({
-            label: v.name,
+            label: nama(NAMA, v.name),
             min: v.min,
             max: v.max,
             step: 0.1,

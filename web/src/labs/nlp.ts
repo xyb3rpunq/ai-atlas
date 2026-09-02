@@ -20,6 +20,23 @@ import type { Stage } from "../viz.js";
 
 type Tab = "pipeline" | "stem" | "tfidf" | "similarity";
 
+/*
+ * # Kenapa contohnya tetap berbahasa Indonesia di halaman berbahasa Inggris
+ *
+ * Karena yang diperagakan laboratorium ini adalah **morfologi bahasa
+ * Indonesia**. `stem_id` mengupas awalan "me-", "di-", "ber-" dan akhiran
+ * "-kan", "-an", "-nya" mengikuti algoritme Nazief–Adriani; menjalankannya
+ * pada kalimat berbahasa Inggris tidak menghasilkan pelajaran apa pun, hanya
+ * kata yang dipotong sembarangan.
+ *
+ * Jadi yang dwibahasa di sini antarmukanya, sedangkan bahan yang dianalisis
+ * tetap Indonesia — dan itu dinyatakan terang-terangan di layar, bukan
+ * dibiarkan tampak seperti terjemahan yang terlupa. Wadah yang memuat bahan
+ * itu ditandai `data-korpus="id"`, sehingga uji yang menolak kata Indonesia di
+ * halaman berbahasa Inggris tahu persis bagian mana yang memang dikecualikan —
+ * dan bagian lain mana pun tetap dituntut diterjemahkan.
+ */
+
 const SAMPLE_TEXT =
   "Saya suka membaca buku di perpustakaan kampus. Pelayanannya bagus dan petugasnya ramah. Sayangnya bukunya tidak lengkap.";
 
@@ -97,22 +114,26 @@ export function mount(root: HTMLElement): () => void {
               {
                 label: bi("Kalimat", "Sentences"),
                 value: result.sentences.join(" | ").slice(0, 62) || "—",
+                korpus: "id",
                 note: pick(bi(`${result.sentences.length} kalimat`, `${result.sentences.length} sentence(s)`)),
               },
               {
                 label: bi("Token", "Tokens"),
                 value: result.tokens.join(" · ").slice(0, 62) || "—",
+                korpus: "id",
                 note: pick(bi(`${result.tokens.length} token`, `${result.tokens.length} tokens`)),
               },
               {
                 label: bi("Buang kata henti", "Remove stopwords"),
                 value: result.after_stopwords.join(" · ").slice(0, 62) || "—",
+                korpus: "id",
                 note: pick(bi(`${removed} kata dibuang`, `${removed} words dropped`)),
                 skipped: !removeStopwords,
               },
               {
                 label: bi("Cari kata dasar", "Stem"),
                 value: result.final_tokens.join(" · ").slice(0, 62) || "—",
+                korpus: "id",
                 note: pick(
                   bi(
                     `${result.stems.filter((s) => s.original !== s.stem).length} kata dikupas`,
@@ -179,6 +200,7 @@ export function mount(root: HTMLElement): () => void {
                 result.final_tokens.join(" · "),
               ],
             ],
+            "id",
           ),
           el("p", {
             class: "note",
@@ -211,6 +233,7 @@ export function mount(root: HTMLElement): () => void {
                     s.steps.map((st) => `${st.kind}: ${st.affix}`).join(" → "),
                     s.in_dictionary ? "✓" : "—",
                   ]),
+                  "id",
                 )
               : el("p", {
                   class: "note",
@@ -241,6 +264,7 @@ export function mount(root: HTMLElement): () => void {
                     .join(", ") || "—",
                 ],
               ],
+              "id",
             ),
             el("p", {
               class: "note",
@@ -263,6 +287,7 @@ export function mount(root: HTMLElement): () => void {
             el("p", {
               class: "note",
               text: grams.slice(0, 40).join(" | ") || pick(bi("kosong", "empty")),
+              attrs: { "data-korpus": "id" },
             }),
           ),
         );
@@ -618,6 +643,21 @@ export function mount(root: HTMLElement): () => void {
       );
 
       const extras: HTMLElement[] = [];
+
+      // Dinyatakan terang-terangan, bukan dibiarkan tampak seperti terjemahan
+      // yang terlupa: bahan yang dianalisis di sini tetap Bahasa Indonesia,
+      // karena itulah bahasa yang morfologinya sedang dibedah.
+      extras.push(
+        el("p", {
+          class: "note",
+          text: pick(
+            bi(
+              "Bahan yang dianalisis di laboratorium ini berbahasa Indonesia, termasuk ketika antarmukanya berbahasa Inggris. Pengupas imbuhannya mengikuti algoritme Nazief–Adriani untuk morfologi Bahasa Indonesia — awalan “me-”, “di-”, “ber-” dan akhiran “-kan”, “-an”, “-nya”. Menjalankannya pada kalimat Bahasa Inggris hanya memotong kata secara sembarangan. Silakan ganti teksnya dengan kalimat Bahasa Indonesia Anda sendiri.",
+              "The material analysed in this lab is Indonesian, even when the interface is in English. Its stemmer implements the Nazief–Adriani algorithm for Indonesian morphology — prefixes “me-”, “di-”, “ber-” and suffixes “-kan”, “-an”, “-nya”. Running it on English sentences merely chops words at random. Feel free to replace the text with your own Indonesian sentences.",
+            ),
+          ),
+        }),
+      );
 
       if (tab === "pipeline") {
         const area = el("textarea", {

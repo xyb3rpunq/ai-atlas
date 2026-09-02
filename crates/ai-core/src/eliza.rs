@@ -353,6 +353,139 @@ pub fn indonesian_script() -> Script {
     }
 }
 
+/// Naskah ELIZA berbahasa Inggris, mengikuti DOCTOR asli Weizenbaum.
+///
+/// # Kenapa dua naskah, bukan satu yang diterjemahkan
+///
+/// Karena ELIZA tidak menerjemahkan apa pun — ia mencocokkan **kata kunci**.
+/// Kata kuncinya bagian dari algoritmanya, bukan hiasannya: "saya merasa"
+/// tidak akan pernah cocok dengan kalimat berbahasa Inggris, dan tabel
+/// penukaran kata gantinya juga hanya berlaku untuk satu bahasa.
+///
+/// Jadi yang dwibahasa di sini bukan teksnya, melainkan naskahnya. Mesinnya
+/// sendiri tidak berubah sama sekali, dan itu justru yang ingin diperlihatkan
+/// laboratorium ini: seluruh "kecerdasan" ELIZA ada di dalam datanya.
+///
+/// Kata kunci dan keutamaannya sengaja dibuat sepadan dengan naskah Indonesia
+/// — sepuluh aturan yang sama, keutamaan yang sama — supaya keduanya bisa
+/// diperbandingkan langsung di layar.
+pub fn english_script() -> Script {
+    let rule = |keyword: &str, priority: i32, responses: &[&str]| Rule {
+        keyword: keyword.to_string(),
+        priority,
+        responses: responses.iter().map(|r| r.to_string()).collect(),
+    };
+
+    Script {
+        name: "ELIZA in English".to_string(),
+        rules: vec![
+            rule(
+                "i feel",
+                10,
+                &[
+                    "How long have you felt {}?",
+                    "What do you think made you feel {}?",
+                ],
+            ),
+            rule(
+                "i want",
+                9,
+                &[
+                    "What would change if you got {}?",
+                    "Why do you want {}?",
+                ],
+            ),
+            rule(
+                "i can't",
+                9,
+                &[
+                    "What is stopping you {}?",
+                    "What would have to change before you could {}?",
+                ],
+            ),
+            rule(
+                "i",
+                5,
+                &["Tell me more about {}.", "Why do you say {}?"],
+            ),
+            rule(
+                "mother",
+                8,
+                &[
+                    "Tell me more about your family.",
+                    "How do you get along with your mother?",
+                ],
+            ),
+            rule(
+                "father",
+                8,
+                &[
+                    "How do you feel about your father?",
+                    "Tell me more about your family.",
+                ],
+            ),
+            rule(
+                "why",
+                6,
+                &[
+                    "Why do you think that is?",
+                    "Does that question come up often?",
+                ],
+            ),
+            rule("no", 3, &["Why not?", "You sound quite certain."]),
+            rule("yes", 3, &["You sound sure.", "Go on."]),
+            rule(
+                "friend",
+                7,
+                &[
+                    "What do your friends mean to you?",
+                    "Tell me more about them.",
+                ],
+            ),
+            rule(
+                "hello",
+                4,
+                &[
+                    "Hello. What would you like to talk about?",
+                    "Hello. How are you today?",
+                ],
+            ),
+        ],
+        fallbacks: vec![
+            "Tell me more.".to_string(),
+            "That is interesting. Go on.".to_string(),
+            "What makes you think about that?".to_string(),
+            "Could you put that another way?".to_string(),
+        ],
+        reflections: vec![
+            ("i".into(), "you".into()),
+            ("me".into(), "you".into()),
+            ("my".into(), "your".into()),
+            ("mine".into(), "yours".into()),
+            ("myself".into(), "yourself".into()),
+            ("am".into(), "are".into()),
+            ("you".into(), "i".into()),
+            ("your".into(), "my".into()),
+            ("yours".into(), "mine".into()),
+            ("yourself".into(), "myself".into()),
+            ("we".into(), "you".into()),
+        ],
+    }
+}
+
+/// Naskah untuk sebuah kode bahasa. Selain `"en"`, dipakai naskah Indonesia.
+///
+/// Jatuh ke Indonesia alih-alih menolak: kode bahasa yang tidak dikenal datang
+/// dari alamat yang bisa disunting siapa saja, dan halaman yang menolak
+/// menjawab lebih buruk daripada halaman yang menjawab dalam bahasa bawaannya.
+pub fn script_for(lang: &str) -> Script {
+    if lang == "en" {
+        english_script()
+    } else {
+        indonesian_script()
+    }
+}
+
 /// Ringkasan sebuah naskah, dipakai untuk membongkar cara kerjanya.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScriptSummary {
@@ -446,6 +579,57 @@ mod tests {
         assert_eq!(reflect("saya sedih.", &r), "Anda sedih");
         assert_eq!(reflect("  aku  ", &r), "Anda");
         assert_eq!(reflect("", &r), "");
+    }
+
+    #[test]
+    fn naskah_inggris_sah_dan_sepadan() {
+        let en = english_script();
+        let id = indonesian_script();
+        en.validate().unwrap();
+        // Sepadan supaya keduanya bisa diperbandingkan langsung di layar:
+        // jumlah aturan, keutamaan, dan jumlah balasan cadangan yang sama.
+        assert_eq!(en.rules.len(), id.rules.len());
+        assert_eq!(en.fallbacks.len(), id.fallbacks.len());
+        let mut ku_en: Vec<i32> = en.rules.iter().map(|r| r.priority).collect();
+        let mut ku_id: Vec<i32> = id.rules.iter().map(|r| r.priority).collect();
+        ku_en.sort_unstable();
+        ku_id.sort_unstable();
+        assert_eq!(ku_en, ku_id);
+        // Dan kata kuncinya benar-benar berbeda: naskah yang tersalin akan
+        // lolos setiap pemeriksaan di atas tanpa menjawab satu pun kalimat
+        // berbahasa Inggris.
+        for r in &en.rules {
+            assert!(
+                !id.rules.iter().any(|x| x.keyword == r.keyword),
+                "kata kunci tersalin: {}",
+                r.keyword
+            );
+        }
+    }
+
+    #[test]
+    fn naskah_inggris_menjawab_kalimat_inggris() {
+        let en = english_script();
+        let jawab = respond(&en, "i feel tired lately", 1).unwrap();
+        assert_eq!(jawab.matched_keyword, "i feel");
+        assert!(!jawab.used_fallback);
+        // Kata gantinya ikut ditukar, dan itulah seluruh triknya: "my" jadi
+        // "your", "am" jadi "are". Tanpa penukaran itu ELIZA akan menjawab
+        // dengan kalimat yang masih memakai sudut pandang penanyanya.
+        let pantul = respond(&en, "i am worried about my future", 1).unwrap();
+        assert_eq!(pantul.matched_keyword, "i");
+        assert_eq!(pantul.reflected_fragment, "are worried about your future");
+    }
+
+    #[test]
+    fn pemilih_naskah_jatuh_ke_indonesia() {
+        // Kode bahasa datang dari alamat yang bisa disunting siapa saja.
+        // Halaman yang menolak menjawab lebih buruk daripada halaman yang
+        // menjawab dalam bahasa bawaannya.
+        assert_eq!(script_for("en").name, english_script().name);
+        assert_eq!(script_for("id").name, indonesian_script().name);
+        assert_eq!(script_for("kl").name, indonesian_script().name);
+        assert_eq!(script_for("").name, indonesian_script().name);
     }
 
     #[test]

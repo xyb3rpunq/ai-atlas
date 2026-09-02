@@ -15,6 +15,8 @@
  */
 
 import * as engine from "../engine.js";
+import { bagaimanaKesimpulan, kalimatAturanPakar, kenapaAturan, nama } from "../aturan.js";
+import type { KamusNama } from "../aturan.js";
 import { T, bi, pick } from "../i18n.js";
 import { buttonRow, card, clear, el, errorNote, fmt, slider, table } from "../ui.js";
 import { figure, nodeGraph } from "../viz.js";
@@ -78,7 +80,7 @@ function grafInferensi(
       const kuat = cf !== undefined && Math.abs(cf) > 1e-9;
       return {
         id: fact,
-        label: fact,
+        label: nama(NAMA, fact),
         layer,
         detail: kuat ? fmt(cf, 2) : undefined,
         tone: !kuat ? "mati" : diberikan.has(fact) ? "netral" : "aktif",
@@ -99,6 +101,62 @@ function grafInferensi(
   }
   return { nodes, edges };
 }
+
+/**
+ * Nama gejala dan kesimpulan yang dibaca manusia.
+ *
+ * Terpisah dari basis pengetahuannya karena di dalam mesin nama-nama itu
+ * **kunci**: "demam" pada premis satu aturan menunjuk fakta yang sama dengan
+ * "demam" pada kesimpulan aturan lain. Menerjemahkannya di sana akan memutus
+ * rantai penalarannya — aturan yang menyimpulkan "fever" tidak akan pernah
+ * menyalakan aturan yang menuntut "demam".
+ */
+const NAMA: KamusNama = {
+  demam: bi("demam", "fever"),
+  "demam tinggi": bi("demam tinggi", "high fever"),
+  pilek: bi("pilek", "runny nose"),
+  batuk: bi("batuk", "cough"),
+  "nyeri otot": bi("nyeri otot", "muscle ache"),
+  "bersin berulang": bi("bersin berulang", "repeated sneezing"),
+  "sesak napas": bi("sesak napas", "shortness of breath"),
+  flu: bi("flu", "influenza"),
+  alergi: bi("alergi", "allergy"),
+  "rujuk ke dokter": bi("rujuk ke dokter", "refer to a doctor"),
+};
+
+/**
+ * Alasan pakar di balik tiap aturan, berkunci `id` aturan.
+ *
+ * Dulu tersimpan di dalam basis pengetahuan sebagai satu untai — satu-satunya
+ * bidangnya yang berupa kalimat untuk dibaca manusia, dan karena itu
+ * satu-satunya yang hanya bisa punya satu bahasa.
+ */
+const ALASAN = {
+  R1: bi(
+    "Ketiganya bersamaan adalah pola khas influenza.",
+    "All three together are the classic influenza pattern.",
+  ),
+  R2: bi(
+    "Demam disertai nyeri otot menguatkan dugaan influenza.",
+    "Fever with muscle ache strengthens the suspicion of influenza.",
+  ),
+  R3: bi(
+    "Pilek tanpa demam lebih menyerupai reaksi alergi.",
+    "A runny nose without fever looks more like an allergic reaction.",
+  ),
+  R4: bi(
+    "Bersin berulang tanpa demam adalah gejala alergi yang umum.",
+    "Repeated sneezing without fever is a common allergy symptom.",
+  ),
+  R5: bi(
+    "Sesak napas pada influenza memerlukan pemeriksaan langsung.",
+    "Shortness of breath during influenza needs an in-person examination.",
+  ),
+  R6: bi(
+    "Demam tinggi selalu perlu diperiksa, apa pun penyebabnya.",
+    "A high fever always needs examining, whatever its cause.",
+  ),
+};
 
 /** Contoh kasus siap pakai. */
 const PRESETS: { label: { id: string; en: string }; facts: Record<string, number> }[] = [
@@ -160,7 +218,7 @@ export function mount(root: HTMLElement): () => void {
           forward.derived.length > 0
             ? table(
                 [pick(bi("Kesimpulan", "Conclusion")), pick(bi("Keyakinan", "Certainty"))],
-                forward.derived.map(([f, cf]) => [f, cf]),
+                forward.derived.map(([f, cf]) => [nama(NAMA, f), cf]),
               )
             : el("p", {
                 class: "note",
@@ -225,9 +283,9 @@ export function mount(root: HTMLElement): () => void {
               ],
               forward.steps.map((s) => [
                 String(s.order),
-                s.text,
-                s.support.map(([f, cf]) => `${f} ${fmt(cf, 2)}`).join(" · "),
-                s.conclusion,
+                kalimatAturanPakar(s, NAMA),
+                s.support.map(([f, cf]) => `${nama(NAMA, f)} ${fmt(cf, 2)}`).join(" · "),
+                nama(NAMA, s.conclusion),
                 s.conclusion_certainty,
               ]),
             ),
@@ -243,17 +301,30 @@ export function mount(root: HTMLElement): () => void {
             whyRule
               ? el("p", {
                   class: "note",
-                  text: (() => {
-                    try {
-                      return engine.expertWhy(kb, whyRule);
-                    } catch {
-                      return "";
-                    }
-                  })(),
+                  text: kenapaAturan(kb, whyRule, NAMA, ALASAN),
                 })
               : null,
           ),
         );
+
+        // "Bagaimana" untuk hipotesis yang sedang dipilih di bawah.
+        //
+        // "Kenapa" menjawab kenapa sebuah aturan ada; ini menjawab pertanyaan
+        // yang sebenarnya ditanyakan orang, yaitu dari mana kesimpulan ini
+        // datang. Sebuah kesimpulan bisa datang lewat lebih dari satu aturan,
+        // dan hanya jawaban ini yang memperlihatkannya.
+        const jalan = bagaimanaKesimpulan(forward.steps, goal, (n) => fmt(n, 2), NAMA);
+        if (jalan.length > 0) {
+          output.append(
+            card(
+              `${pick(bi("Bagaimana", "How"))} — ${nama(NAMA, goal)}`,
+              el("ol", {
+                class: "langkah",
+                children: jalan.map((baris) => el("li", { text: baris })),
+              }),
+            ),
+          );
+        }
       }
 
       // Runut mundur terhadap hipotesis terpilih.
@@ -284,7 +355,11 @@ export function mount(root: HTMLElement): () => void {
         rows: (string | number)[][] = [],
       ): (string | number)[][] => {
         const indent = "· ".repeat(node.depth);
-        rows.push([`${indent}${node.goal}`, outcomeLabel(node.outcome), node.certainty]);
+        rows.push([
+          `${indent}${nama(NAMA, node.goal)}`,
+          outcomeLabel(node.outcome),
+          node.certainty,
+        ]);
         for (const child of node.children) flatten(child, rows);
         return rows;
       };
@@ -294,7 +369,7 @@ export function mount(root: HTMLElement): () => void {
           pick(bi("Runut mundur — pohon pembuktian", "Backward chaining — proof tree")),
           buttonRow(
             inspection.derivable.map((f) => ({
-              label: f,
+              label: nama(NAMA, f),
               selected: f === goal,
               onClick: () => {
                 goal = f;
@@ -315,8 +390,8 @@ export function mount(root: HTMLElement): () => void {
                 class: "note",
                 text: pick(
                   bi(
-                    `Masih perlu ditanyakan: ${backward.questions.join(", ")}. Dari ${inspection.askable.length} gejala yang bisa ditanyakan, hanya ini yang relevan — dan yang tidak akan mengubah jawaban sudah dipangkas.`,
-                    `Still needs asking: ${backward.questions.join(", ")}. Of ${inspection.askable.length} askable symptoms, only these are relevant — those that cannot change the answer are already pruned.`,
+                    `Masih perlu ditanyakan: ${backward.questions.map((q) => nama(NAMA, q)).join(", ")}. Dari ${inspection.askable.length} gejala yang bisa ditanyakan, hanya ini yang relevan — dan yang tidak akan mengubah jawaban sudah dipangkas.`,
+                    `Still needs asking: ${backward.questions.map((q) => nama(NAMA, q)).join(", ")}. Of ${inspection.askable.length} askable symptoms, only these are relevant — those that cannot change the answer are already pruned.`,
                   ),
                 ),
               })
@@ -338,16 +413,16 @@ export function mount(root: HTMLElement): () => void {
               [pick(bi("Jumlah aturan", "Rules")), String(inspection.rules)],
               [
                 pick(bi("Bisa disimpulkan", "Derivable")),
-                inspection.derivable.join(", "),
+                inspection.derivable.map((f) => nama(NAMA, f)).join(", "),
               ],
               [
                 pick(bi("Harus ditanyakan", "Leaf facts")),
-                inspection.leaf_facts.join(", "),
+                inspection.leaf_facts.map((f) => nama(NAMA, f)).join(", "),
               ],
               [
                 pick(bi("Tak terjangkau", "Unreachable")),
                 inspection.unreachable_facts.length > 0
-                  ? inspection.unreachable_facts.join(", ")
+                  ? inspection.unreachable_facts.map((f) => nama(NAMA, f)).join(", ")
                   : pick(bi("tidak ada", "none")),
               ],
             ],
@@ -370,7 +445,7 @@ export function mount(root: HTMLElement): () => void {
 
       const symptomCards = inspection.askable.map((symptom) =>
         slider({
-          label: symptom,
+          label: nama(NAMA, symptom),
           min: -1,
           max: 1,
           step: 0.1,

@@ -537,8 +537,14 @@ pub struct RuleTrace {
     pub degrees: Vec<f64>,
     /// Derajat penyalaan aturan setelah penghubung dan bobot.
     pub firing_strength: f64,
-    /// Bentuk teks aturan, siap ditampilkan.
-    pub text: String,
+    /// Premis aturan, sejajar dengan `degrees`.
+    pub antecedents: Vec<Antecedent>,
+    /// Penghubung antarpremis.
+    pub connective: Connective,
+    /// Nama variabel keluaran.
+    pub output: String,
+    /// Himpunan keluaran yang disimpulkan aturan ini.
+    pub consequent_set: String,
 }
 
 /// Hasil inferensi lengkap.
@@ -604,7 +610,6 @@ impl FuzzySystem {
         let mut traces = Vec::with_capacity(self.rules.len());
         for (i, rule) in self.rules.iter().enumerate() {
             let mut degrees = Vec::with_capacity(rule.antecedents.len());
-            let mut parts = Vec::with_capacity(rule.antecedents.len());
             for a in &rule.antecedents {
                 let var = self
                     .inputs
@@ -614,26 +619,19 @@ impl FuzzySystem {
                 let set = var.set(&a.set)?;
                 let d = set.degree(lookup(&a.variable)?);
                 degrees.push(d);
-                parts.push(format!("{} = {}", a.variable, a.set));
             }
             let combined = match rule.connective {
                 Connective::And => degrees.iter().copied().fold(1.0_f64, f64::min),
                 Connective::Or => degrees.iter().copied().fold(0.0_f64, f64::max),
             };
-            let joiner = match rule.connective {
-                Connective::And => " DAN ",
-                Connective::Or => " ATAU ",
-            };
             traces.push(RuleTrace {
                 index: i + 1,
                 degrees,
                 firing_strength: (combined * rule.weight).clamp(0.0, 1.0),
-                text: format!(
-                    "JIKA {} MAKA {} = {}",
-                    parts.join(joiner),
-                    self.output.name,
-                    rule.consequent_set
-                ),
+                antecedents: rule.antecedents.clone(),
+                connective: rule.connective,
+                output: self.output.name.clone(),
+                consequent_set: rule.consequent_set.clone(),
             });
         }
         Ok(traces)
@@ -1673,13 +1671,19 @@ mod tests {
             .unwrap();
         for (i, t) in hasil.rules.iter().enumerate() {
             assert_eq!(t.index, i + 1);
-            assert!(t.text.starts_with("JIKA"));
-            assert!(t.text.contains("MAKA"));
             assert!((0.0..=1.0).contains(&t.firing_strength));
             assert!(!t.degrees.is_empty());
+            // Jejaknya membawa bentuk aturannya, bukan kalimatnya. Kalimat
+            // yang dirakit di sini akan selalu berbahasa Indonesia, sedangkan
+            // yang membacanya belum tentu.
+            assert_eq!(t.degrees.len(), t.antecedents.len());
+            assert_eq!(t.output, s.output.name);
+            assert!(!t.consequent_set.is_empty());
+            assert_eq!(t.antecedents, s.rules[i].antecedents);
+            assert_eq!(t.connective, s.rules[i].connective);
         }
-        // Aturan berpenghubung OR memakai kata sambung yang benar.
-        assert!(hasil.rules[0].text.contains(" ATAU "));
+        // Aturan pertama memang berpenghubung OR.
+        assert_eq!(hasil.rules[0].connective, Connective::Or);
     }
 
     #[test]

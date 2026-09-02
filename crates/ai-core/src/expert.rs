@@ -119,9 +119,12 @@ pub struct Rule {
     /// Keyakinan pakar terhadap aturan ini.
     #[serde(default = "one")]
     pub certainty: f64,
-    /// Penjelasan mengapa aturan ini ada, ditampilkan pada jawaban "kenapa".
-    #[serde(default)]
-    pub rationale: String,
+    // Alasan pakar sengaja tidak ada di sini.
+    //
+    // Ia satu-satunya bidang basis pengetahuan yang berupa kalimat untuk
+    // dibaca manusia, bukan kunci penalaran — dan kalimat yang disimpan di
+    // mesin hanya bisa punya satu bahasa. Alasannya kini disimpan sisi
+    // antarmuka, berkunci `id` aturan, dalam kedua bahasa.
 }
 
 fn one() -> f64 {
@@ -276,8 +279,16 @@ pub struct Step {
     pub order: usize,
     /// Aturan yang menyala.
     pub rule_id: String,
-    /// Bentuk teks aturan, siap ditampilkan.
-    pub text: String,
+    /// Premis aturan, apa adanya — termasuk premis yang dinegasikan.
+    ///
+    /// Yang dikembalikan bentuk aturannya, bukan kalimatnya. Kalimat yang
+    /// dirakit di sini akan selalu berbahasa Indonesia, sedangkan yang
+    /// membacanya belum tentu; merakitnya sisi antarmuka membuat "JIKA … DAN
+    /// BUKAN … MAKA …" dan "IF … AND NOT … THEN …" berasal dari satu sumber
+    /// yang sama.
+    pub premises: Vec<Premise>,
+    /// Penghubung antarpremis.
+    pub connective: Connective,
     /// Fakta yang dihasilkan.
     pub conclusion: String,
     /// Keyakinan gabungan premis.
@@ -297,26 +308,6 @@ pub struct ForwardResult {
     pub steps: Vec<Step>,
     /// Berapa kali seluruh basis aturan disapu.
     pub passes: usize,
-}
-
-/// Menyusun bentuk teks sebuah aturan.
-fn rule_text(rule: &Rule) -> String {
-    let joiner = match rule.connective {
-        Connective::And => " DAN ",
-        Connective::Or => " ATAU ",
-    };
-    let premises: Vec<String> = rule
-        .premises
-        .iter()
-        .map(|p| {
-            if p.expected {
-                p.fact.clone()
-            } else {
-                format!("BUKAN {}", p.fact)
-            }
-        })
-        .collect();
-    format!("JIKA {} MAKA {}", premises.join(joiner), rule.conclusion)
 }
 
 /// Keyakinan sebuah premis terhadap memori kerja saat ini.
@@ -402,7 +393,8 @@ pub fn forward_chain(
             steps.push(Step {
                 order: steps.len() + 1,
                 rule_id: rule.id.clone(),
-                text: rule_text(rule),
+                premises: rule.premises.clone(),
+                connective: rule.connective,
                 conclusion: rule.conclusion.clone(),
                 premise_certainty: premise_cf,
                 conclusion_certainty: after,
@@ -616,59 +608,18 @@ fn prove(
     })
 }
 
-/// Menjawab "kenapa aturan ini ditanyakan" untuk sebuah aturan.
-pub fn explain_why(kb: &KnowledgeBase, rule_id: &str) -> Option<String> {
-    let rule = kb.rules.iter().find(|r| r.id == rule_id)?;
-    let alasan = if rule.rationale.is_empty() {
-        String::new()
-    } else {
-        format!(" {}", rule.rationale)
-    };
-    Some(format!(
-        "{} dipakai untuk menyimpulkan {}.{alasan}",
-        rule_text(rule),
-        rule.conclusion
-    ))
-}
-
-/// Menjawab "bagaimana sampai pada kesimpulan ini" dalam bentuk teks berurut.
-pub fn explain_how(result: &ForwardResult, fact: &str) -> Vec<String> {
-    result
-        .steps
-        .iter()
-        .filter(|s| s.conclusion == fact)
-        .map(|s| {
-            let dukungan: Vec<String> = s
-                .support
-                .iter()
-                .map(|(f, cf)| format!("{f} ({cf:.2})"))
-                .collect();
-            format!(
-                "Langkah {}: {} [{}] menghasilkan {} dengan keyakinan {:.2}",
-                s.order,
-                s.rule_id,
-                dukungan.join(", "),
-                s.conclusion,
-                s.conclusion_certainty
-            )
-        })
-        .collect()
-}
-
 /// Basis pengetahuan contoh: diagnosis flu, dari studi kasus modul Sesi 11.
 pub fn flu_knowledge_base() -> KnowledgeBase {
     let rule = |id: &str,
                 premises: Vec<Premise>,
                 connective: Connective,
                 conclusion: &str,
-                certainty: f64,
-                rationale: &str| Rule {
+                certainty: f64| Rule {
         id: id.to_string(),
         premises,
         connective,
         conclusion: conclusion.to_string(),
         certainty,
-        rationale: rationale.to_string(),
     };
 
     KnowledgeBase {
@@ -684,7 +635,6 @@ pub fn flu_knowledge_base() -> KnowledgeBase {
                 Connective::And,
                 "flu",
                 0.9,
-                "Ketiganya bersamaan adalah pola khas influenza.",
             ),
             rule(
                 "R2",
@@ -692,7 +642,6 @@ pub fn flu_knowledge_base() -> KnowledgeBase {
                 Connective::And,
                 "flu",
                 0.7,
-                "Demam disertai nyeri otot menguatkan dugaan influenza.",
             ),
             rule(
                 "R3",
@@ -700,7 +649,6 @@ pub fn flu_knowledge_base() -> KnowledgeBase {
                 Connective::And,
                 "alergi",
                 0.8,
-                "Pilek tanpa demam lebih menyerupai reaksi alergi.",
             ),
             rule(
                 "R4",
@@ -708,7 +656,6 @@ pub fn flu_knowledge_base() -> KnowledgeBase {
                 Connective::And,
                 "alergi",
                 0.7,
-                "Bersin berulang tanpa demam adalah gejala alergi yang umum.",
             ),
             rule(
                 "R5",
@@ -716,7 +663,6 @@ pub fn flu_knowledge_base() -> KnowledgeBase {
                 Connective::And,
                 "rujuk ke dokter",
                 0.95,
-                "Sesak napas pada influenza memerlukan pemeriksaan langsung.",
             ),
             rule(
                 "R6",
@@ -724,7 +670,6 @@ pub fn flu_knowledge_base() -> KnowledgeBase {
                 Connective::Or,
                 "rujuk ke dokter",
                 0.9,
-                "Demam tinggi selalu perlu diperiksa, apa pun penyebabnya.",
             ),
         ],
         askable: vec![
@@ -1083,7 +1028,6 @@ mod tests {
                     connective: Connective::And,
                     conclusion: "p".into(),
                     certainty: 1.0,
-                    rationale: String::new(),
                 },
                 Rule {
                     id: "B".into(),
@@ -1091,7 +1035,6 @@ mod tests {
                     connective: Connective::And,
                     conclusion: "q".into(),
                     certainty: 1.0,
-                    rationale: String::new(),
                 },
             ],
             askable: vec![],
@@ -1104,40 +1047,25 @@ mod tests {
     }
 
     #[test]
-    fn penjelasan_kenapa() {
-        let kb = flu_knowledge_base();
-        let teks = explain_why(&kb, "R1").unwrap();
-        assert!(teks.contains("JIKA"));
-        assert!(teks.contains("flu"));
-        assert!(teks.contains("influenza"), "alasan pakar harus ikut muncul");
-        assert!(explain_why(&kb, "R99").is_none());
-    }
-
-    #[test]
-    fn penjelasan_bagaimana() {
+    fn jejak_membawa_bentuk_aturan_bukan_kalimatnya() {
+        // Yang dikembalikan mesin adalah bentuk aturannya. Kalimatnya dirakit
+        // sisi antarmuka, supaya "JIKA … DAN BUKAN … MAKA …" dan
+        // "IF … AND NOT … THEN …" berasal dari satu sumber yang sama.
         let kb = flu_knowledge_base();
         let awal = memori(&[("demam", 1.0), ("pilek", 1.0), ("batuk", 1.0)]);
         let hasil = forward_chain(&kb, &awal).unwrap();
-        let langkah = explain_how(&hasil, "flu");
-        assert!(!langkah.is_empty());
-        assert!(langkah[0].contains("R1"));
-        assert!(langkah[0].contains("demam"));
-        assert!(explain_how(&hasil, "tidak ada").is_empty());
-    }
-
-    #[test]
-    fn bentuk_teks_aturan() {
-        let kb = flu_knowledge_base();
-        let r1 = rule_text(&kb.rules[0]);
-        assert!(r1.starts_with("JIKA "));
-        assert!(r1.contains(" DAN "));
-        assert!(r1.ends_with("MAKA flu"));
-
-        let r3 = rule_text(&kb.rules[2]);
-        assert!(r3.contains("BUKAN demam"));
-
-        let r6 = rule_text(&kb.rules[5]);
-        assert!(r6.contains("demam tinggi"));
+        let langkah = hasil
+            .steps
+            .iter()
+            .find(|s| s.rule_id == "R1")
+            .expect("R1 harus menyala");
+        let aturan = kb.rules.iter().find(|r| r.id == "R1").unwrap();
+        assert_eq!(langkah.premises, aturan.premises);
+        assert_eq!(langkah.connective, aturan.connective);
+        assert_eq!(langkah.conclusion, "flu");
+        // Premis yang dinegasikan tetap terbawa apa adanya, bukan hilang.
+        let r3 = kb.rules.iter().find(|r| r.id == "R3").unwrap();
+        assert!(r3.premises.iter().any(|p| !p.expected && p.fact == "demam"));
     }
 
     #[test]

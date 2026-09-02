@@ -669,6 +669,17 @@ export interface Stage {
   note?: string;
   /** Tahap yang tidak terjadi digambar pudar. */
   skipped?: boolean;
+  /**
+   * Kode bahasa bahan yang sedang dianalisis, bila `value` memang berisi bahan
+   * itu dan bukan teks antarmuka.
+   *
+   * Dipakai laboratorium yang memperagakan pengolahan bahasa Indonesia: di
+   * halaman berbahasa Inggris, kalimat contohnya tetap Indonesia karena
+   * itulah yang sedang dibedah. Menandainya membuat uji yang menolak kata
+   * Indonesia tahu persis bagian mana yang dikecualikan — dan bagian lain
+   * mana pun tetap dituntut diterjemahkan.
+   */
+  korpus?: string;
 }
 
 /**
@@ -711,6 +722,7 @@ export function pipeline(stages: Stage[]): SVGSVGElement {
         "font-family": "var(--font-mono)",
         fill: "var(--text)",
         opacity: pudar ? 0.5 : 1,
+        "data-korpus": s.korpus ?? null,
       }),
     );
     if (s.note) {

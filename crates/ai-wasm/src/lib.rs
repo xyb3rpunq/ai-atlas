@@ -709,36 +709,6 @@ pub fn expert_backward(kb_json: &str, facts_json: &str, goal: &str) -> String {
     }
 }
 
-/// Jawaban atas pertanyaan "kenapa aturan ini ada".
-#[wasm_bindgen]
-pub fn expert_why(kb_json: &str, rule_id: &str) -> String {
-    let kb: ai_core::expert::KnowledgeBase = match serde_json::from_str(kb_json) {
-        Ok(v) => v,
-        Err(e) => return err(e),
-    };
-    match ai_core::expert::explain_why(&kb, rule_id) {
-        Some(v) => ok(v),
-        None => err(format!("aturan tidak ditemukan: {rule_id}")),
-    }
-}
-
-/// Jawaban atas pertanyaan "bagaimana kesimpulan ini diperoleh".
-#[wasm_bindgen]
-pub fn expert_how(kb_json: &str, facts_json: &str, fact: &str) -> String {
-    let kb: ai_core::expert::KnowledgeBase = match serde_json::from_str(kb_json) {
-        Ok(v) => v,
-        Err(e) => return err(e),
-    };
-    let memory = match build_memory(facts_json) {
-        Ok(v) => v,
-        Err(e) => return err(e),
-    };
-    match ai_core::expert::forward_chain(&kb, &memory) {
-        Ok(result) => ok(ai_core::expert::explain_how(&result, fact)),
-        Err(e) => err(e),
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Sesi 12 & 13 — Sains Data dan Machine Learning
 // ---------------------------------------------------------------------------
@@ -1327,8 +1297,8 @@ pub fn logic_semantic_network(node: &str) -> String {
 
 /// Balasan ELIZA beserta penjelasan bagaimana ia dihasilkan.
 #[wasm_bindgen]
-pub fn eliza_respond(input: &str, seed: u64) -> String {
-    let script = ai_core::eliza::indonesian_script();
+pub fn eliza_respond(input: &str, seed: u64, lang: &str) -> String {
+    let script = ai_core::eliza::script_for(lang);
     match ai_core::eliza::respond(&script, input, seed) {
         Ok(v) => ok(v),
         Err(e) => err(e),
@@ -1337,16 +1307,14 @@ pub fn eliza_respond(input: &str, seed: u64) -> String {
 
 /// Ringkasan naskah ELIZA, untuk membongkar cara kerjanya.
 #[wasm_bindgen]
-pub fn eliza_script_summary() -> String {
-    ok(ai_core::eliza::summarise(
-        &ai_core::eliza::indonesian_script(),
-    ))
+pub fn eliza_script_summary(lang: &str) -> String {
+    ok(ai_core::eliza::summarise(&ai_core::eliza::script_for(lang)))
 }
 
 /// Naskah lengkap, sehingga pengguna bisa membaca seluruh aturannya.
 #[wasm_bindgen]
-pub fn eliza_script() -> String {
-    ok(ai_core::eliza::indonesian_script())
+pub fn eliza_script(lang: &str) -> String {
+    ok(ai_core::eliza::script_for(lang))
 }
 
 // ---------------------------------------------------------------------------
@@ -1900,16 +1868,15 @@ mod tests {
     }
 
     #[test]
-    fn penjelasan_lewat_jembatan() {
-        let why = expert_why(&kb_uji(), "R1");
-        assert!(why.contains("JIKA"), "{why}");
-        assert!(expert_why(&kb_uji(), "R99").contains("err"));
-        assert!(expert_why("bukan", "R1").contains("err"));
-
-        let how = expert_how(&kb_uji(), GEJALA_FLU, "flu");
-        assert!(how.contains("R1"), "{how}");
-        assert!(expert_how("bukan", GEJALA_FLU, "flu").contains("err"));
-        assert!(expert_how(&kb_uji(), "bukan", "flu").contains("err"));
+    fn jejak_maju_membawa_bentuk_aturan() {
+        // Penjelasan "kenapa" dan "bagaimana" dulu dirakit di sini sebagai
+        // kalimat Indonesia. Keduanya dipindahkan ke sisi antarmuka, yang
+        // sudah memegang basis pengetahuannya dan tahu bahasa pembacanya —
+        // jadi yang dijamin di sini tinggal kelengkapan bahannya.
+        let maju = expert_forward(&kb_uji(), GEJALA_FLU, 0.2);
+        assert!(maju.contains("premises"), "{maju}");
+        assert!(maju.contains("connective"), "{maju}");
+        assert!(maju.contains("R1"), "{maju}");
     }
 
     const X_KNN: &str = r#"[[1,1],[1.2,0.9],[0.8,1.1],[8,8],[8.2,7.9],[7.8,8.1]]"#;
@@ -2186,25 +2153,34 @@ mod tests {
 
     #[test]
     fn eliza_lewat_jembatan() {
-        let out = eliza_respond("saya merasa sedih", 1);
+        let out = eliza_respond("saya merasa sedih", 1, "id");
         assert!(!out.contains(r#""err""#), "{out}");
         assert!(out.contains("matched_keyword"));
         assert!(!out.contains("{}"), "penanda templat bocor: {out}");
 
-        let ringkas = eliza_script_summary();
+        // Naskah Inggris dipilih lewat kode bahasa yang sama, dan kata
+        // kuncinya benar-benar berbeda: naskah yang salah akan jatuh ke
+        // balasan cadangan tanpa satu pun galat.
+        let en = eliza_respond("i feel sad", 1, "en");
+        assert!(!en.contains(r#""err""#), "{en}");
+        assert!(en.contains(r#""matched_keyword":"i feel""#), "{en}");
+        assert!(!en.contains("{}"), "penanda templat bocor: {en}");
+
+        let ringkas = eliza_script_summary("id");
         assert!(ringkas.contains("keywords"), "{ringkas}");
-        assert!(eliza_script().contains("rules"));
+        assert!(eliza_script("id").contains("rules"));
+        assert!(eliza_script("en").contains("ELIZA in English"));
     }
 
     #[test]
     fn eliza_menolak_masukan_terlalu_panjang() {
         let panjang = "a".repeat(2_000);
-        assert!(eliza_respond(&panjang, 1).contains("err"));
+        assert!(eliza_respond(&panjang, 1, "id").contains("err"));
     }
 
     #[test]
     fn eliza_masukan_kosong_tetap_dijawab() {
-        let out = eliza_respond("", 1);
+        let out = eliza_respond("", 1, "id");
         assert!(!out.contains(r#""err""#), "{out}");
         assert!(out.contains(r#""used_fallback":true"#));
     }

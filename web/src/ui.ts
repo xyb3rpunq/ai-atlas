@@ -154,11 +154,13 @@ export function card(
 }
 
 /** Angka besar dengan keterangan di bawahnya. */
-export function readout(label: string, value: string): HTMLElement {
+export function readout(label: string, value: string, korpus?: string): HTMLElement {
   return el("div", {
     attrs: { "data-ekspor": "hasil", "data-label": label, "data-nilai": value },
     children: [
-      el("div", { class: "readout", text: value }),
+      // Hanya nilainya yang ditandai sebagai bahan, tidak labelnya. Labelnya
+      // teks antarmuka dan tetap harus diterjemahkan.
+      el("div", { class: "readout", text: value, attrs: { "data-korpus": korpus ?? null } }),
       el("div", { class: "readout__label", text: label }),
     ],
   });
@@ -205,7 +207,11 @@ function cellNumber(v: number): string {
 }
 
 /** Tabel sederhana dari kepala kolom dan baris. */
-export function table(head: string[], rows: (string | number)[][]): HTMLElement {
+export function table(
+  head: string[],
+  rows: (string | number)[][],
+  korpus?: string,
+): HTMLElement {
   return el("div", {
     class: "scroll-x",
     children: [
@@ -219,6 +225,9 @@ export function table(head: string[], rows: (string | number)[][]): HTMLElement 
             ],
           }),
           el("tbody", {
+            // Hanya isinya yang ditandai sebagai bahan; kepala tabelnya teks
+            // antarmuka dan tetap harus diterjemahkan.
+            attrs: { "data-korpus": korpus ?? null },
             children: rows.map((row) =>
               el("tr", {
                 children: row.map((cell) =>

@@ -11,7 +11,8 @@
  */
 
 import * as engine from "../engine.js";
-import { bi, pick } from "../i18n.js";
+import { bi, lang, pick } from "../i18n.js";
+import type { Lang } from "../i18n.js";
 import { buttonRow, card, clear, el, errorNote, table } from "../ui.js";
 import { figure, pipeline, rankedBars } from "../viz.js";
 
@@ -21,15 +22,38 @@ interface Turn {
   reply: engine.ElizaReply;
 }
 
-const SUGGESTIONS = [
-  "Halo",
-  "Saya merasa lelah akhir-akhir ini",
-  "Saya ingin pindah kerja",
-  "Ibu saya sering mengkhawatirkan saya",
-  "Saya tidak bisa tidur nyenyak",
-  "Kenapa semuanya terasa berat",
-  "Cuaca hari ini cerah sekali",
-];
+/**
+ * Kalimat contoh, dalam kedua bahasa.
+ *
+ * Bukan terjemahan satu per satu, melainkan pasangan yang **memicu aturan
+ * yang sama**. Menerjemahkan "Saya merasa lelah" menjadi "I am tired" akan
+ * menghasilkan kalimat yang benar tetapi tidak menyentuh aturan "i feel" —
+ * dan contoh yang jatuh ke balasan cadangan tidak memperagakan apa pun.
+ *
+ * Kalimat terakhir sengaja tidak menyentuh satu pun kata kunci di kedua
+ * bahasa: ia yang memperlihatkan balasan cadangan, dan tanpa contoh seperti
+ * itu batas kemampuan ELIZA tidak pernah terlihat.
+ */
+const SUGGESTIONS: Record<Lang, string[]> = {
+  id: [
+    "Halo",
+    "Saya merasa lelah akhir-akhir ini",
+    "Saya ingin pindah kerja",
+    "Ibu saya sering mengkhawatirkan saya",
+    "Saya tidak bisa tidur nyenyak",
+    "Kenapa semuanya terasa berat",
+    "Cuaca hari ini cerah sekali",
+  ],
+  en: [
+    "Hello",
+    "I feel tired lately",
+    "I want to change jobs",
+    "My mother worries about me a lot",
+    "I can't sleep well",
+    "Why does everything feel heavy",
+    "The weather is lovely today",
+  ],
+};
 
 /**
  * Memasang laboratorium ke dalam elemen yang diberikan.
@@ -42,8 +66,12 @@ export function mount(root: HTMLElement): () => void {
     let turns: Turn[] = [];
     let seed = 1;
 
-    const summary = engine.elizaScriptSummary();
-    const script = engine.elizaScript();
+    // Naskahnya dibaca sekali saat dipasang. Laboratorium ini dipasang ulang
+    // ketika bahasanya berganti, jadi naskahnya selalu naskah bahasa yang
+    // sedang dibaca.
+    const bahasa = lang();
+    const summary = engine.elizaScriptSummary(bahasa);
+    const script = engine.elizaScript(bahasa);
 
     const controls = el("div");
     const output = el("div");
@@ -52,7 +80,7 @@ export function mount(root: HTMLElement): () => void {
       const trimmed = text.trim();
       if (trimmed.length === 0) return;
       try {
-        const reply = engine.elizaRespond(trimmed, seed);
+        const reply = engine.elizaRespond(trimmed, seed, bahasa);
         turns.push({ user: trimmed, reply });
         seed += 1;
       } catch (error) {
@@ -309,7 +337,7 @@ export function mount(root: HTMLElement): () => void {
         card(
           pick(bi("Coba kalimat ini", "Try these")),
           buttonRow(
-            SUGGESTIONS.map((s) => ({
+            SUGGESTIONS[bahasa].map((s) => ({
               label: s,
               onClick: () => send(s),
             })),

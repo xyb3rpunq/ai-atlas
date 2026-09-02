@@ -571,6 +571,22 @@ td.num {
   margin-top: 1rem;
 }
 
+/*
+ * Daftar bernomor untuk jawaban "bagaimana": satu baris per langkah
+ * penalaran. Bernomor, bukan berbutir, karena urutannya bagian dari
+ * jawabannya — langkah kedua memakai kesimpulan langkah pertama.
+ */
+.langkah {
+  margin: 0;
+  padding-left: 1.4rem;
+  font-size: 0.86rem;
+  color: var(--text-muted);
+}
+
+.langkah li + li {
+  margin-top: 0.35rem;
+}
+
 .error {
   color: var(--danger);
   font-family: var(--font-mono);
