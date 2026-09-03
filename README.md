@@ -234,6 +234,50 @@ Laporannya mengikuti struktur halaman: tiap kartu menjadi satu bagian bernama, s
 
 Seluruh empat belas sesi sudah terimplementasi dan bisa dijalankan. Tidak ada bagian yang berstatus "segera".
 
+## Mesin menyediakan bentuk, antarmuka menyusun kalimat
+
+Tiga hal yang dulu dirakit menjadi kalimat di dalam Rust, dan karena itu selalu
+berbahasa Indonesia di halaman mana pun:
+
+| Yang dulu keluar dari mesin | Yang keluar sekarang |
+|---|---|
+| `"JIKA Pelayanan = Buruk ATAU Makanan = Hambar MAKA Tip = Sedikit"` | premis, penghubung, dan himpunan keluarannya |
+| `"JIKA demam DAN pilek MAKA flu"` | premis beserta negasinya, penghubung, kesimpulan |
+| `"MB/MD harus di rentang [0,1], diberi 1.5"` | `{"kode": "cf.mb_md_di_luar_rentang", "arg": ["1.5"]}` |
+
+Alasannya satu dan sama: **mesin tidak tahu, dan tidak seharusnya tahu, siapa
+yang sedang membaca.** Selama kalimatnya dirakit di sana, sisi antarmuka tidak
+punya cara memperbaikinya — yang ia terima sudah berupa kalimat jadi.
+
+Pesan kegagalan justru yang paling buruk untuk salah bahasa. Yang membacanya
+sedang mengalami sesuatu yang tidak ia harapkan, dan pada saat itu ia paling
+membutuhkan kalimat yang bisa ia baca.
+
+**`Display` di sisi Rust tetap ada dan tetap berbahasa Indonesia.** Pembacanya
+pengembang yang sedang menatap kegagalan uji, dan pesan uji yang berbunyi
+`cari.awal_terhalang` jauh lebih sulit dibaca daripada kalimatnya.
+
+### Yang menjaganya tetap lengkap
+
+`error_codes()` menyerahkan seluruh 80 kode yang bisa datang dari mesin beserta
+jumlah argumennya. Ujinya menuntut tiga hal sekaligus:
+
+- setiap kode punya kalimatnya di kedua bahasa;
+- tidak ada kalimat yang tidak punya kode — sisa terjemahan dari kode yang sudah
+  dihapus di Rust;
+- jumlah penanda `%1`, `%2` sepadan dengan jumlah argumen di sisi Rust.
+
+Penandanya bernomor, bukan berurutan, karena urutan kata berbeda antarbahasa:
+`"diberi %2, harus 1 sampai %1"` dan `"must be 1 to %1, got %2"` menyisipkan
+nilai yang sama di tempat yang berbeda.
+
+Di sisi Rust, daftar kode dan implementasinya saling menjaga: ada uji yang
+menuntut setiap varian galat punya kode di daftar dengan jumlah argumen yang
+sepadan, dan sebaliknya bahwa tidak ada kode di daftar yang tidak dipakai varian
+mana pun.
+
+---
+
 ## Anggaran performa
 
 Batas ini diperiksa otomatis di CI. Build gagal kalau terlampaui — bukan sekadar niat baik.
@@ -310,21 +354,29 @@ Setiap fungsi publik punya uji. Bukan uji jalur bahagia saja — uji nilai batas
 | `fx.rs` | 8 | 17 |
 | `rng.rs` | 9 | 16 |
 | `lib.rs` | 2 | 4 |
-| `ai-wasm/lib.rs` | 55 | 70 |
+| `galat.rs` | 3 | 9 |
+| `ai-wasm/lib.rs` | 56 | 74 |
 | `web/src/ui.ts` | 11 | 15 |
 | `web/src/viz.ts` | 11 | 42 |
 | `web/src/labs/notes.ts` | 1 | 54 |
 | `web/src/labs/registry.ts` | 2 | 21 |
 | `web/src/ekspor.ts` | 7 | 29 |
 | `web/src/enam-bahasa.ts` | 6 | 17 |
+| `web/src/galat.ts` | 2 | 12 |
+| `web/src/aturan.ts` | 5 | 6 |
 | `tools/conform` (Go) | 23 | 12 |
 | `oracle/` (PL/SQL) | 27 | 60 |
-| **Total** | **419** | **805** |
+| **Total** | **425** | **836** |
 
-Ditambah **3.796 pernyataan konformansi** yang mengadu keenam implementasi terhadap vektor yang sama. Angka itu bukan bagian dari 805 di atas: uji unit membuktikan tiap implementasi konsisten dengan dirinya sendiri, sedangkan konformansi membuktikan ketiganya sepakat satu sama lain — dan hanya yang kedua yang bisa menangkap rumus yang salah tetapi konsisten.
+Ditambah **3.796 pernyataan konformansi** yang mengadu keenam implementasi terhadap vektor yang sama. Angka itu bukan bagian dari 836 di atas: uji unit membuktikan tiap implementasi konsisten dengan dirinya sendiri, sedangkan konformansi membuktikan ketiganya sepakat satu sama lain — dan hanya yang kedua yang bisa menangkap rumus yang salah tetapi konsisten.
 
 Beberapa uji yang menahan seluruh proyek ini tetap jujur:
 
+- **Kelengkapan terjemahan galat** — `error_codes()` menyerahkan seluruh kode
+  yang bisa datang dari mesin, dan kamus pesannya harus memuat tepat kode-kode
+  itu dengan jumlah penanda yang sepadan. Tanpa uji ini, satu-satunya cara
+  mengetahui ada kode yang belum diterjemahkan adalah menemuinya — dan yang
+  menemuinya adalah pengguna yang sedang mengalami kegagalan.
 - **Pemeriksaan gradien** — perambatan balik dibandingkan dengan selisih hingga
   pada tiap bobot. Jaringan yang gradiennya salah tetap sering "belajar", hanya
   lebih lambat dan berhenti di tempat yang keliru; hanya uji inilah yang
@@ -615,6 +667,35 @@ Every user-visible string is a `Bilingual` value — `bi("Indonesian",
 "English")` — so a missing translation is a **type error**, not a string that
 silently falls back to the wrong language. The chosen language persists in
 `localStorage` and sets `document.documentElement.lang`.
+
+That extends into the engine, which is where it is easy to get wrong. Three
+things used to be assembled into sentences inside Rust, and were therefore
+always Indonesian on every page:
+
+| What the engine used to return | What it returns now |
+|---|---|
+| `"JIKA Pelayanan = Buruk ATAU Makanan = Hambar MAKA Tip = Sedikit"` | the premises, the connective, and the output set |
+| `"JIKA demam DAN pilek MAKA flu"` | the premises with their negations, the connective, the conclusion |
+| `"MB/MD harus di rentang [0,1], diberi 1.5"` | `{"kode": "cf.mb_md_di_luar_rentang", "arg": ["1.5"]}` |
+
+One reason covers all three: **the engine does not know, and should not know,
+who is reading.** While the sentence is built there, the interface has no way
+to fix it — what it receives is already a finished sentence.
+
+Error messages are the worst case for a wrong language. Whoever reads one is
+already experiencing something they did not expect, and that is exactly when
+they most need a sentence they can read.
+
+`Display` on the Rust side stays, and stays Indonesian: its readers are
+developers looking at a failing test, and a test message reading
+`cari.awal_terhalang` is far harder to read than the sentence.
+
+`error_codes()` hands over all 80 codes the engine can produce, with their
+argument counts. The tests demand that the message dictionary contains exactly
+those codes, that no message exists without a code, and that the number of `%1`,
+`%2` placeholders matches the argument count on the Rust side — so a new code
+without a translation fails CI rather than being found by a user who is already
+having a bad time.
 
 ### Running it
 

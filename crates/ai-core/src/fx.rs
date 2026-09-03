@@ -148,6 +148,22 @@ pub enum FxError {
     BadDigit(char),
 }
 
+impl crate::galat::Dijelaskan for FxError {
+    fn kode(&self) -> &'static str {
+        match self {
+            FxError::BadLength(_) => "fx.panjang_salah",
+            FxError::BadDigit(_) => "fx.bukan_digit_heksadesimal",
+        }
+    }
+
+    fn argumen(&self) -> Vec<String> {
+        match self {
+            FxError::BadLength(n) => vec![HEX_LEN.to_string(), n.to_string()],
+            FxError::BadDigit(c) => vec![c.to_string()],
+        }
+    }
+}
+
 impl core::fmt::Display for FxError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {

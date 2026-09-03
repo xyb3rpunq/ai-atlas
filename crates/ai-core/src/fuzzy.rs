@@ -39,6 +39,33 @@ pub enum FuzzyError {
     DegreeOutOfRange(f64),
 }
 
+impl crate::galat::Dijelaskan for FuzzyError {
+    fn kode(&self) -> &'static str {
+        match self {
+            FuzzyError::UnorderedPoints(_) => "kabur.titik_tak_terurut",
+            FuzzyError::BadUniverse { .. } => "kabur.semesta_tak_sah",
+            FuzzyError::TooFewSamples(_) => "kabur.cuplikan_terlalu_sedikit",
+            FuzzyError::NoRuleFired => "kabur.tidak_ada_aturan_menyala",
+            FuzzyError::EmptyRuleBase => "kabur.basis_aturan_kosong",
+            FuzzyError::UnknownSet(_) => "kabur.himpunan_tak_dikenal",
+            FuzzyError::UnknownVariable(_) => "kabur.variabel_tak_dikenal",
+            FuzzyError::DegreeOutOfRange(_) => "kabur.derajat_di_luar_rentang",
+        }
+    }
+
+    fn argumen(&self) -> Vec<String> {
+        match self {
+            FuzzyError::UnorderedPoints(s)
+            | FuzzyError::UnknownSet(s)
+            | FuzzyError::UnknownVariable(s) => vec![s.clone()],
+            FuzzyError::DegreeOutOfRange(v) => vec![v.to_string()],
+            FuzzyError::BadUniverse { min, max } => vec![min.to_string(), max.to_string()],
+            FuzzyError::TooFewSamples(n) => vec![n.to_string()],
+            FuzzyError::NoRuleFired | FuzzyError::EmptyRuleBase => Vec::new(),
+        }
+    }
+}
+
 impl core::fmt::Display for FuzzyError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {

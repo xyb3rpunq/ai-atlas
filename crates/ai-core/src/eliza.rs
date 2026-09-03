@@ -30,6 +30,24 @@ pub enum ElizaError {
     InputTooLong(usize),
 }
 
+impl crate::galat::Dijelaskan for ElizaError {
+    fn kode(&self) -> &'static str {
+        match self {
+            ElizaError::EmptyScript => "eliza.naskah_kosong",
+            ElizaError::RuleWithoutResponses(_) => "eliza.aturan_tanpa_balasan",
+            ElizaError::InputTooLong(_) => "eliza.masukan_terlalu_panjang",
+        }
+    }
+
+    fn argumen(&self) -> Vec<String> {
+        match self {
+            ElizaError::EmptyScript => Vec::new(),
+            ElizaError::RuleWithoutResponses(k) => vec![k.clone()],
+            ElizaError::InputTooLong(n) => vec![n.to_string(), MAX_INPUT.to_string()],
+        }
+    }
+}
+
 impl core::fmt::Display for ElizaError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {

@@ -21,6 +21,23 @@ pub enum CfError {
     EmptyInput,
 }
 
+impl crate::galat::Dijelaskan for CfError {
+    fn kode(&self) -> &'static str {
+        match self {
+            CfError::BeliefOutOfRange(_) => "cf.mb_md_di_luar_rentang",
+            CfError::CfOutOfRange(_) => "cf.cf_di_luar_rentang",
+            CfError::EmptyInput => "cf.daftar_kosong",
+        }
+    }
+
+    fn argumen(&self) -> Vec<String> {
+        match self {
+            CfError::BeliefOutOfRange(v) | CfError::CfOutOfRange(v) => vec![v.clone()],
+            CfError::EmptyInput => Vec::new(),
+        }
+    }
+}
+
 impl core::fmt::Display for CfError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {

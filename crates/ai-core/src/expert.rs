@@ -39,6 +39,32 @@ pub enum ExpertError {
     StepLimitExceeded(usize),
 }
 
+impl crate::galat::Dijelaskan for ExpertError {
+    fn kode(&self) -> &'static str {
+        match self {
+            ExpertError::EmptyRuleBase => "pakar.basis_aturan_kosong",
+            ExpertError::RuleWithoutPremises(_) => "pakar.aturan_tanpa_premis",
+            ExpertError::BadCertainty { .. } => "pakar.keyakinan_di_luar_rentang",
+            ExpertError::CircularReasoning(_) => "pakar.penalaran_melingkar",
+            ExpertError::StepLimitExceeded(_) => "pakar.batas_langkah",
+        }
+    }
+
+    fn argumen(&self) -> Vec<String> {
+        match self {
+            ExpertError::EmptyRuleBase => Vec::new(),
+            ExpertError::RuleWithoutPremises(id) => vec![id.clone()],
+            ExpertError::BadCertainty { source, value } => {
+                vec![source.clone(), value.to_string()]
+            }
+            // Jalurnya dirangkai di sini, bukan sisi antarmuka: panah di antara
+            // nama fakta bukan kata, jadi bentuknya sama di bahasa mana pun.
+            ExpertError::CircularReasoning(path) => vec![path.join(" -> ")],
+            ExpertError::StepLimitExceeded(n) => vec![n.to_string()],
+        }
+    }
+}
+
 impl core::fmt::Display for ExpertError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {

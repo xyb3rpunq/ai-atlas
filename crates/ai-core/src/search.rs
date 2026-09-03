@@ -13,6 +13,19 @@ use crate::rng::SplitMix64;
 use serde::{Deserialize, Serialize};
 use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 
+/// Ujung sebuah pencarian: titik berangkat atau titik tujuan.
+///
+/// Sebuah nilai, bukan untai. Untai `"titik awal"` yang dulu disimpan di
+/// dalam galat adalah kalimat Bahasa Indonesia, dan kalimat yang disimpan di
+/// dalam galat hanya bisa punya satu bahasa.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Endpoint {
+    /// Titik berangkat.
+    Start,
+    /// Titik tujuan.
+    Goal,
+}
+
 /// Kesalahan pada pencarian.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SearchError {
@@ -31,7 +44,7 @@ pub enum SearchError {
         y: usize,
     },
     /// Titik awal atau tujuan berdiri di atas dinding.
-    BlockedEndpoint(&'static str),
+    BlockedEndpoint(Endpoint),
     /// Panjang data dinding tidak sepadan dengan ukuran kisi.
     WallLengthMismatch {
         /// Panjang yang diharapkan.
@@ -41,6 +54,31 @@ pub enum SearchError {
     },
 }
 
+impl crate::galat::Dijelaskan for SearchError {
+    fn kode(&self) -> &'static str {
+        match self {
+            SearchError::BadGrid { .. } => "cari.kisi_tak_sah",
+            SearchError::OutOfBounds { .. } => "cari.di_luar_kisi",
+            SearchError::BlockedEndpoint(Endpoint::Start) => "cari.awal_terhalang",
+            SearchError::BlockedEndpoint(Endpoint::Goal) => "cari.tujuan_terhalang",
+            SearchError::WallLengthMismatch { .. } => "cari.panjang_dinding",
+        }
+    }
+
+    fn argumen(&self) -> Vec<String> {
+        match self {
+            SearchError::BadGrid { width, height } => {
+                vec![width.to_string(), height.to_string()]
+            }
+            SearchError::OutOfBounds { x, y } => vec![x.to_string(), y.to_string()],
+            SearchError::BlockedEndpoint(_) => Vec::new(),
+            SearchError::WallLengthMismatch { expected, got } => {
+                vec![expected.to_string(), got.to_string()]
+            }
+        }
+    }
+}
+
 impl core::fmt::Display for SearchError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
@@ -48,9 +86,10 @@ impl core::fmt::Display for SearchError {
                 write!(f, "ukuran kisi tidak sah: {width} x {height}")
             }
             SearchError::OutOfBounds { x, y } => write!(f, "titik ({x}, {y}) di luar kisi"),
-            SearchError::BlockedEndpoint(which) => {
-                write!(f, "{which} berdiri di atas dinding")
-            }
+            SearchError::BlockedEndpoint(which) => match which {
+                Endpoint::Start => write!(f, "titik awal berdiri di atas dinding"),
+                Endpoint::Goal => write!(f, "tujuan berdiri di atas dinding"),
+            },
             SearchError::WallLengthMismatch { expected, got } => {
                 write!(f, "data dinding harus {expected} sel, diberi {got}")
             }
@@ -470,10 +509,10 @@ pub fn search(
         });
     }
     if !grid.passable(start) {
-        return Err(SearchError::BlockedEndpoint("titik awal"));
+        return Err(SearchError::BlockedEndpoint(Endpoint::Start));
     }
     if !grid.passable(goal) {
-        return Err(SearchError::BlockedEndpoint("tujuan"));
+        return Err(SearchError::BlockedEndpoint(Endpoint::Goal));
     }
 
     Ok(match options.algorithm {
@@ -1530,13 +1569,13 @@ mod tests {
         let o = SearchOptions::default();
         assert_eq!(
             search(&g, Point::new(0, 0), Point::new(4, 4), o),
-            Err(SearchError::BlockedEndpoint("titik awal"))
+            Err(SearchError::BlockedEndpoint(Endpoint::Start))
         );
         let mut g2 = Grid::new(5, 5).unwrap();
         g2.set_wall(Point::new(4, 4), true).unwrap();
         assert_eq!(
             search(&g2, Point::new(0, 0), Point::new(4, 4), o),
-            Err(SearchError::BlockedEndpoint("tujuan"))
+            Err(SearchError::BlockedEndpoint(Endpoint::Goal))
         );
     }
 
@@ -1666,7 +1705,7 @@ mod tests {
                 height: 0,
             },
             SearchError::OutOfBounds { x: 1, y: 2 },
-            SearchError::BlockedEndpoint("tujuan"),
+            SearchError::BlockedEndpoint(Endpoint::Goal),
             SearchError::WallLengthMismatch {
                 expected: 9,
                 got: 8,

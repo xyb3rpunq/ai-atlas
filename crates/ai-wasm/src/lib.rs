@@ -19,13 +19,166 @@ fn ok<T: Serialize>(value: T) -> String {
         ok: T,
     }
     serde_json::to_string(&Ok { ok: value })
-        .unwrap_or_else(|e| format!(r#"{{"err":"gagal serialisasi: {e}"}}"#))
+        .unwrap_or_else(|e| err(GalatJembatan::SerialisasiGagal(e.to_string())))
 }
 
-/// Membungkus kegagalan menjadi `{"err": "..."}`.
-fn err<E: core::fmt::Display>(e: E) -> String {
-    let msg = e.to_string().replace('"', "'");
-    format!(r#"{{"err":"{msg}"}}"#)
+/// Kegagalan yang terjadi di jembatan ini, sebelum mesinnya dipanggil.
+///
+/// Punya kode dan argumen seperti galat pustaka inti, dengan alasan yang sama:
+/// kalimatnya dirakit sisi antarmuka, dalam bahasa pembacanya. Lihat
+/// `ai_core::galat`.
+#[derive(Debug, Clone, PartialEq)]
+enum GalatJembatan {
+    /// Masukan bukan JSON yang sah, atau bentuknya tidak sepadan.
+    JsonTakSah(String),
+    /// Hasilnya gagal diserialisasi menjadi JSON.
+    SerialisasiGagal(String),
+    /// Nama operator gabungan CF tidak dikenal.
+    OperatorTakDikenal(String),
+    /// Nama metode defuzzifikasi tidak dikenal.
+    DefuzzifikasiTakDikenal(String),
+    /// Nama mesin inferensi kabur tidak dikenal.
+    InferensiTakDikenal(String),
+    /// Nama kumpulan data tidak dikenal.
+    DatasetTakDikenal(String),
+    /// Nama jenis agen tidak dikenal.
+    JenisAgenTakDikenal(String),
+    /// Nama fungsi aktivasi tidak dikenal.
+    AktivasiTakDikenal(String),
+    /// Batas keputusan hanya bisa digambar untuk jaringan berdua masukan.
+    BatasKeputusanDuaMasukan,
+    /// Resolusi gambar di luar rentang yang wajar.
+    ResolusiDiLuarRentang {
+        /// Batas bawah.
+        min: usize,
+        /// Batas atas.
+        max: usize,
+        /// Nilai yang diberikan.
+        diberi: usize,
+    },
+    /// Rentang sumbu tidak sah: bukan bilangan berhingga, atau terbalik.
+    RentangTakSah {
+        /// Batas bawah yang diberikan.
+        min: f64,
+        /// Batas atas yang diberikan.
+        max: f64,
+    },
+}
+
+/// Seluruh kode galat jembatan ini, beserta jumlah argumennya.
+const KODE_JEMBATAN: &[(&str, usize)] = &[
+    ("mesin.aktivasi_tak_dikenal", 1),
+    ("mesin.batas_keputusan_dua_masukan", 0),
+    ("mesin.dataset_tak_dikenal", 1),
+    ("mesin.defuzzifikasi_tak_dikenal", 1),
+    ("mesin.inferensi_tak_dikenal", 1),
+    ("mesin.jenis_agen_tak_dikenal", 1),
+    ("mesin.json_tak_sah", 1),
+    ("mesin.operator_tak_dikenal", 1),
+    ("mesin.rentang_tak_sah", 2),
+    ("mesin.resolusi_di_luar_rentang", 3),
+    ("mesin.serialisasi_gagal", 1),
+];
+
+impl ai_core::galat::Dijelaskan for GalatJembatan {
+    fn kode(&self) -> &'static str {
+        match self {
+            GalatJembatan::JsonTakSah(_) => "mesin.json_tak_sah",
+            GalatJembatan::SerialisasiGagal(_) => "mesin.serialisasi_gagal",
+            GalatJembatan::OperatorTakDikenal(_) => "mesin.operator_tak_dikenal",
+            GalatJembatan::DefuzzifikasiTakDikenal(_) => "mesin.defuzzifikasi_tak_dikenal",
+            GalatJembatan::InferensiTakDikenal(_) => "mesin.inferensi_tak_dikenal",
+            GalatJembatan::DatasetTakDikenal(_) => "mesin.dataset_tak_dikenal",
+            GalatJembatan::JenisAgenTakDikenal(_) => "mesin.jenis_agen_tak_dikenal",
+            GalatJembatan::AktivasiTakDikenal(_) => "mesin.aktivasi_tak_dikenal",
+            GalatJembatan::BatasKeputusanDuaMasukan => "mesin.batas_keputusan_dua_masukan",
+            GalatJembatan::ResolusiDiLuarRentang { .. } => "mesin.resolusi_di_luar_rentang",
+            GalatJembatan::RentangTakSah { .. } => "mesin.rentang_tak_sah",
+        }
+    }
+
+    fn argumen(&self) -> Vec<String> {
+        match self {
+            GalatJembatan::JsonTakSah(d)
+            | GalatJembatan::SerialisasiGagal(d)
+            | GalatJembatan::OperatorTakDikenal(d)
+            | GalatJembatan::DefuzzifikasiTakDikenal(d)
+            | GalatJembatan::InferensiTakDikenal(d)
+            | GalatJembatan::DatasetTakDikenal(d)
+            | GalatJembatan::JenisAgenTakDikenal(d)
+            | GalatJembatan::AktivasiTakDikenal(d) => vec![d.clone()],
+            GalatJembatan::BatasKeputusanDuaMasukan => Vec::new(),
+            GalatJembatan::ResolusiDiLuarRentang { min, max, diberi } => {
+                vec![min.to_string(), max.to_string(), diberi.to_string()]
+            }
+            GalatJembatan::RentangTakSah { min, max } => {
+                vec![min.to_string(), max.to_string()]
+            }
+        }
+    }
+}
+
+/// Membungkus kegagalan penguraian JSON di batas jembatan.
+fn err_json<E: core::fmt::Display>(e: E) -> String {
+    err(GalatJembatan::JsonTakSah(e.to_string()))
+}
+
+/// Membungkus kegagalan menjadi `{"err": {"kode": "...", "arg": [...]}}`.
+///
+/// # Kenapa kode, bukan kalimat
+///
+/// Karena mesin tidak tahu — dan tidak seharusnya tahu — siapa yang sedang
+/// membaca. Selama kalimatnya dirakit di Rust, setiap kegagalan akan berbunyi
+/// dalam Bahasa Indonesia, termasuk di halaman yang seluruh sisanya berbahasa
+/// Inggris; dan sisi antarmuka tidak punya cara memperbaikinya, karena yang ia
+/// terima sudah berupa kalimat jadi.
+///
+/// Pesan kegagalan justru yang paling buruk untuk salah bahasa: yang
+/// membacanya sedang mengalami sesuatu yang tidak ia harapkan.
+fn err<E: ai_core::galat::Dijelaskan>(e: E) -> String {
+    #[derive(Serialize)]
+    struct Galat {
+        kode: &'static str,
+        arg: Vec<String>,
+    }
+    #[derive(Serialize)]
+    struct Amplop {
+        err: Galat,
+    }
+    let amplop = Amplop {
+        err: Galat {
+            kode: e.kode(),
+            arg: e.argumen(),
+        },
+    };
+    // Kalau amplop sesederhana ini pun gagal diserialisasi, tidak ada jalan
+    // lain yang tersisa; yang ditulis tangan di sini adalah bentuk yang sama.
+    serde_json::to_string(&amplop)
+        .unwrap_or_else(|_| r#"{"err":{"kode":"mesin.serialisasi_gagal","arg":[""]}}"#.to_string())
+}
+
+/// Seluruh kode galat yang bisa datang dari mesin ini, sebagai JSON.
+///
+/// Dipakai uji sisi antarmuka untuk menuntut kelengkapan terjemahannya. Tanpa
+/// daftar yang bisa dibaca, satu-satunya cara mengetahui ada kode yang belum
+/// diterjemahkan adalah menemuinya — dan yang menemuinya adalah pengguna yang
+/// sedang mengalami kegagalan.
+#[wasm_bindgen]
+pub fn error_codes() -> String {
+    #[derive(Serialize)]
+    struct Kode {
+        kode: &'static str,
+        argumen: usize,
+    }
+    let daftar: Vec<Kode> = ai_core::galat::KODE
+        .iter()
+        .chain(KODE_JEMBATAN.iter())
+        .map(|(kode, argumen)| Kode {
+            kode,
+            argumen: *argumen,
+        })
+        .collect();
+    ok(daftar)
 }
 
 /// Versi pustaka inti.
@@ -76,7 +229,7 @@ pub fn cf_from_mb_md(mb: f64, md: f64) -> String {
 pub fn cf_combine(cfs_json: &str) -> String {
     let cfs: Vec<f64> = match serde_json::from_str(cfs_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     match ai_core::certainty::combine_many_traced(&cfs) {
         Ok((value, steps)) => {
@@ -104,12 +257,12 @@ pub fn cf_combine(cfs_json: &str) -> String {
 pub fn cf_premise(cfs_json: &str, operator: &str) -> String {
     let cfs: Vec<f64> = match serde_json::from_str(cfs_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let result = match operator.to_ascii_uppercase().as_str() {
         "AND" => ai_core::certainty::combine_and(&cfs),
         "OR" => ai_core::certainty::combine_or(&cfs),
-        other => return err(format!("operator tidak dikenal: {other}")),
+        other => return err(GalatJembatan::OperatorTakDikenal(other.to_string())),
     };
     match result {
         Ok(v) => ok(v),
@@ -144,11 +297,11 @@ pub fn bayes_binary(prior: f64, likelihood_h: f64, likelihood_not_h: f64) -> Str
 pub fn bayes_posterior_all(priors_json: &str, likelihoods_json: &str) -> String {
     let priors: Vec<f64> = match serde_json::from_str(priors_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let likelihoods: Vec<f64> = match serde_json::from_str(likelihoods_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     match ai_core::bayes::posterior_all(&priors, &likelihoods) {
         Ok(v) => ok(v),
@@ -164,11 +317,11 @@ pub fn bayes_posterior_all(priors_json: &str, likelihoods_json: &str) -> String 
 pub fn naive_bayes_predict(samples_json: &str, query_json: &str, alpha: f64) -> String {
     let samples: Vec<ai_core::bayes::CategoricalSample> = match serde_json::from_str(samples_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let query: Vec<String> = match serde_json::from_str(query_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let mut model = ai_core::bayes::CategoricalNaiveBayes::new(alpha);
     if let Err(e) = model.fit(&samples) {
@@ -192,7 +345,7 @@ pub fn naive_bayes_predict(samples_json: &str, query_json: &str, alpha: f64) -> 
 pub fn fuzzy_degree(set_json: &str, x: f64) -> String {
     let set: ai_core::fuzzy::Membership = match serde_json::from_str(set_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     if let Err(e) = set.validate() {
         return err(e);
@@ -205,7 +358,7 @@ pub fn fuzzy_degree(set_json: &str, x: f64) -> String {
 pub fn fuzzy_curve(set_json: &str, min: f64, max: f64, samples: usize) -> String {
     let set: ai_core::fuzzy::Membership = match serde_json::from_str(set_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     if let Err(e) = set.validate() {
         return err(e);
@@ -239,11 +392,11 @@ pub fn fuzzy_infer(
 ) -> String {
     let system: ai_core::fuzzy::FuzzySystem = match serde_json::from_str(system_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let inputs: Vec<(String, f64)> = match serde_json::from_str(inputs_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let result = match engine.to_ascii_lowercase().as_str() {
         "mamdani" => {
@@ -253,13 +406,13 @@ pub fn fuzzy_infer(
                 "mean_of_maximum" | "mom" => ai_core::fuzzy::Defuzzifier::MeanOfMaximum,
                 "smallest_of_maximum" | "som" => ai_core::fuzzy::Defuzzifier::SmallestOfMaximum,
                 "largest_of_maximum" | "lom" => ai_core::fuzzy::Defuzzifier::LargestOfMaximum,
-                other => return err(format!("metode defuzzifikasi tidak dikenal: {other}")),
+                other => return err(GalatJembatan::DefuzzifikasiTakDikenal(other.to_string())),
             };
             system.infer_mamdani(&inputs, m, samples)
         }
         "sugeno" => system.infer_sugeno(&inputs),
         "tsukamoto" => system.infer_tsukamoto(&inputs),
-        other => return err(format!("mesin inferensi tidak dikenal: {other}")),
+        other => return err(GalatJembatan::InferensiTakDikenal(other.to_string())),
     };
     match result {
         Ok(v) => ok(v),
@@ -287,11 +440,11 @@ pub fn search_run(
 ) -> String {
     let grid: ai_core::search::Grid = match serde_json::from_str(grid_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let options: ai_core::search::SearchOptions = match serde_json::from_str(options_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     match ai_core::search::search(
         &grid,
@@ -339,11 +492,11 @@ pub fn search_compare(
 
     let grid: ai_core::search::Grid = match serde_json::from_str(grid_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let base: ai_core::search::SearchOptions = match serde_json::from_str(options_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
 
     #[derive(Serialize)]
@@ -401,7 +554,7 @@ pub fn search_compare(
 // ---------------------------------------------------------------------------
 
 /// Membaca nama aktivasi.
-fn parse_activation(name: &str) -> Result<ai_core::neural::Activation, String> {
+fn parse_activation(name: &str) -> Result<ai_core::neural::Activation, GalatJembatan> {
     use ai_core::neural::Activation;
     Ok(match name.to_ascii_lowercase().as_str() {
         "step" => Activation::Step,
@@ -410,7 +563,7 @@ fn parse_activation(name: &str) -> Result<ai_core::neural::Activation, String> {
         "relu" => Activation::Relu,
         "leaky_relu" => Activation::LeakyRelu,
         "linear" => Activation::Linear,
-        other => return Err(format!("aktivasi tidak dikenal: {other}")),
+        other => return Err(GalatJembatan::AktivasiTakDikenal(other.to_string())),
     })
 }
 
@@ -452,7 +605,7 @@ pub fn neural_create(
 ) -> String {
     let sizes: Vec<usize> = match serde_json::from_str(sizes_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let hidden = match parse_activation(hidden_activation) {
         Ok(v) => v,
@@ -487,7 +640,7 @@ pub fn neural_dataset(name: &str, points: usize, noise: f64, seed: u64) -> Strin
             (x, y.into_iter().map(|v| vec![v]).collect())
         }
         "spiral" => ai_core::neural::spiral_dataset(points, noise, seed),
-        other => return err(format!("kumpulan data tidak dikenal: {other}")),
+        other => return err(GalatJembatan::DatasetTakDikenal(other.to_string())),
     };
     ok(Data { x, y })
 }
@@ -507,15 +660,15 @@ pub fn neural_train(
 ) -> String {
     let mut net: ai_core::neural::Network = match serde_json::from_str(network_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let x: Vec<Vec<f64>> = match serde_json::from_str(x_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let y: Vec<Vec<f64>> = match serde_json::from_str(y_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     match net.train(&x, &y, epochs, tolerance, seed) {
         Ok(history) => {
@@ -542,18 +695,20 @@ pub fn neural_train(
 pub fn neural_decision_grid(network_json: &str, min: f64, max: f64, resolution: usize) -> String {
     let net: ai_core::neural::Network = match serde_json::from_str(network_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     if net.input_size() != 2 {
-        return err("batas keputusan hanya bisa digambar untuk dua masukan");
+        return err(GalatJembatan::BatasKeputusanDuaMasukan);
     }
     if !(2..=400).contains(&resolution) {
-        return err(format!(
-            "resolusi harus antara 2 dan 400, diberi {resolution}"
-        ));
+        return err(GalatJembatan::ResolusiDiLuarRentang {
+            min: 2,
+            max: 400,
+            diberi: resolution,
+        });
     }
     if !min.is_finite() || !max.is_finite() || min >= max {
-        return err(format!("rentang tidak sah: {min} sampai {max}"));
+        return err(GalatJembatan::RentangTakSah { min, max });
     }
 
     let step = (max - min) / (resolution - 1) as f64;
@@ -612,7 +767,7 @@ pub fn expert_sample_kb() -> String {
 pub fn expert_inspect_kb(kb_json: &str) -> String {
     let kb: ai_core::expert::KnowledgeBase = match serde_json::from_str(kb_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     if let Err(e) = kb.validate() {
         return err(e);
@@ -653,11 +808,11 @@ fn build_memory(facts_json: &str) -> Result<ai_core::expert::WorkingMemory, Stri
 pub fn expert_forward(kb_json: &str, facts_json: &str, threshold: f64) -> String {
     let kb: ai_core::expert::KnowledgeBase = match serde_json::from_str(kb_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let memory = match build_memory(facts_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     match ai_core::expert::forward_chain(&kb, &memory) {
         Ok(result) => {
@@ -697,11 +852,11 @@ pub fn expert_forward(kb_json: &str, facts_json: &str, threshold: f64) -> String
 pub fn expert_backward(kb_json: &str, facts_json: &str, goal: &str) -> String {
     let kb: ai_core::expert::KnowledgeBase = match serde_json::from_str(kb_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let memory = match build_memory(facts_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     match ai_core::expert::backward_chain(&kb, &memory, goal) {
         Ok(v) => ok(v),
@@ -736,19 +891,19 @@ pub fn ml_knn_predict(
 ) -> String {
     let x: Vec<Vec<f64>> = match serde_json::from_str(x_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let y: Vec<String> = match serde_json::from_str(y_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let query: Vec<f64> = match serde_json::from_str(query_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let d = match parse_distance(distance) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let model = match ai_core::ml::Knn::new(x, y, k, d, weighted) {
         Ok(v) => v,
@@ -781,23 +936,25 @@ pub fn ml_knn_regions(
 ) -> String {
     let x: Vec<Vec<f64>> = match serde_json::from_str(x_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let y: Vec<String> = match serde_json::from_str(y_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let d = match parse_distance(distance) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     if !(2..=200).contains(&resolution) {
-        return err(format!(
-            "resolusi harus antara 2 dan 200, diberi {resolution}"
-        ));
+        return err(GalatJembatan::ResolusiDiLuarRentang {
+            min: 2,
+            max: 200,
+            diberi: resolution,
+        });
     }
     if !min.is_finite() || !max.is_finite() || min >= max {
-        return err(format!("rentang tidak sah: {min} sampai {max}"));
+        return err(GalatJembatan::RentangTakSah { min, max });
     }
 
     // Daftar kelas dikumpulkan lebih dulu supaya keluarannya berupa indeks
@@ -849,11 +1006,11 @@ pub fn ml_kmeans(
 ) -> String {
     let x: Vec<Vec<f64>> = match serde_json::from_str(x_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let d = match parse_distance(distance) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     match ai_core::ml::kmeans(&x, k, d, max_iterations, seed) {
         Ok(v) => ok(v),
@@ -866,15 +1023,15 @@ pub fn ml_kmeans(
 pub fn ml_build_tree(x_json: &str, y_json: &str, names_json: &str, max_depth: usize) -> String {
     let x: Vec<Vec<String>> = match serde_json::from_str(x_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let y: Vec<String> = match serde_json::from_str(y_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let names: Vec<String> = match serde_json::from_str(names_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     match ai_core::ml::build_id3(&x, &y, &names, max_depth) {
         Ok(tree) => {
@@ -916,11 +1073,11 @@ pub fn ml_build_tree(x_json: &str, y_json: &str, names_json: &str, max_depth: us
 pub fn ml_tree_predict(tree_json: &str, row_json: &str) -> String {
     let tree: ai_core::ml::TreeNode = match serde_json::from_str(tree_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let row: Vec<String> = match serde_json::from_str(row_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     ok(tree.predict(&row))
 }
@@ -930,11 +1087,11 @@ pub fn ml_tree_predict(tree_json: &str, row_json: &str) -> String {
 pub fn ml_fit_linear(x_json: &str, y_json: &str) -> String {
     let x: Vec<f64> = match serde_json::from_str(x_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let y: Vec<f64> = match serde_json::from_str(y_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     match ai_core::ml::fit_linear(&x, &y) {
         Ok(v) => ok(v),
@@ -947,11 +1104,11 @@ pub fn ml_fit_linear(x_json: &str, y_json: &str) -> String {
 pub fn ml_evaluate(actual_json: &str, predicted_json: &str) -> String {
     let actual: Vec<String> = match serde_json::from_str(actual_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let predicted: Vec<String> = match serde_json::from_str(predicted_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     match ai_core::ml::evaluate(&actual, &predicted) {
         Ok(v) => ok(v),
@@ -1070,10 +1227,10 @@ pub fn nlp_stem(word: &str) -> String {
 pub fn nlp_tfidf(documents_json: &str, remove_stop: bool, do_stem: bool) -> String {
     let texts: Vec<String> = match serde_json::from_str(documents_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     if texts.is_empty() {
-        return err("korpus kosong");
+        return err(ai_core::nlp::NlpError::EmptyCorpus);
     }
 
     let docs: Vec<Vec<String>> = texts
@@ -1220,7 +1377,7 @@ pub fn logic_equivalent(a: &str, b: &str) -> String {
 pub fn logic_resolve(knowledge_json: &str, conclusion: &str) -> String {
     let texts: Vec<String> = match serde_json::from_str(knowledge_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let mut formulas = Vec::with_capacity(texts.len());
     for t in &texts {
@@ -1328,11 +1485,11 @@ pub fn eliza_script(lang: &str) -> String {
 pub fn agent_compare(dirty_json: &str, position: usize, max_steps: usize) -> String {
     let dirty: Vec<bool> = match serde_json::from_str(dirty_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let world = match ai_core::agent::VacuumWorld::new(dirty, position) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     ok(ai_core::agent::compare_agents(&world, max_steps))
 }
@@ -1343,18 +1500,18 @@ pub fn agent_run(dirty_json: &str, position: usize, kind: &str, max_steps: usize
     use ai_core::agent::AgentKind;
     let dirty: Vec<bool> = match serde_json::from_str(dirty_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let world = match ai_core::agent::VacuumWorld::new(dirty, position) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     let kind = match kind.to_ascii_lowercase().as_str() {
         "simple_reflex" => AgentKind::SimpleReflex,
         "model_based" => AgentKind::ModelBased,
         "goal_based" => AgentKind::GoalBased,
         "utility_based" => AgentKind::UtilityBased,
-        other => return err(format!("jenis agen tidak dikenal: {other}")),
+        other => return err(GalatJembatan::JenisAgenTakDikenal(other.to_string())),
     };
     ok(ai_core::agent::run_agent(&world, kind, max_steps))
 }
@@ -1447,7 +1604,7 @@ pub fn robotics_path(
 ) -> String {
     let obstacles: Vec<ai_core::robotics::Obstacle> = match serde_json::from_str(obstacles_json) {
         Ok(v) => v,
-        Err(e) => return err(e),
+        Err(e) => return err_json(e),
     };
     match ai_core::robotics::plan_potential_field(
         (0.0, 0.0),
@@ -1470,9 +1627,96 @@ mod tests {
     #[test]
     fn pembungkus_ok_dan_err() {
         assert_eq!(ok(1.5), r#"{"ok":1.5}"#);
-        assert!(err("gagal").contains("gagal"));
-        // Tanda kutip ganda pada pesan galat tidak boleh merusak JSON.
-        assert!(!err(r#"pesan "aneh""#).contains(r#""aneh""#));
+        // Amplop galat membawa kode dan argumen, bukan kalimat.
+        let g = err(ai_core::nlp::NlpError::EmptyCorpus);
+        assert_eq!(g, r#"{"err":{"kode":"bahasa.korpus_kosong","arg":[]}}"#);
+        let b = err(GalatJembatan::OperatorTakDikenal(r#"XOR "aneh""#.into()));
+        assert!(b.contains(r#""kode":"mesin.operator_tak_dikenal""#), "{b}");
+        // Tanda kutip ganda di dalam argumen tidak boleh merusak JSON-nya:
+        // sekarang ia dilewatkan serde, bukan dirangkai dengan `format!`.
+        let balik: serde_json::Value = serde_json::from_str(&b).unwrap();
+        assert_eq!(balik["err"]["arg"][0], r#"XOR "aneh""#);
+    }
+
+    #[test]
+    fn tiap_galat_jembatan_terdaftar() {
+        use ai_core::galat::Dijelaskan;
+        // Satu contoh tiap varian. Rust tidak punya cara menelusuri varian
+        // sebuah enum saat program berjalan, jadi daftar ini satu-satunya
+        // tempat yang tahu semuanya — dan uji di bawahnya yang menjaga ia
+        // tidak pernah tertinggal.
+        let semua: Vec<Box<dyn Dijelaskan>> = vec![
+            Box::new(GalatJembatan::JsonTakSah("x".into())),
+            Box::new(GalatJembatan::SerialisasiGagal("x".into())),
+            Box::new(GalatJembatan::OperatorTakDikenal("XOR".into())),
+            Box::new(GalatJembatan::DefuzzifikasiTakDikenal("x".into())),
+            Box::new(GalatJembatan::InferensiTakDikenal("x".into())),
+            Box::new(GalatJembatan::DatasetTakDikenal("x".into())),
+            Box::new(GalatJembatan::JenisAgenTakDikenal("x".into())),
+            Box::new(GalatJembatan::AktivasiTakDikenal("x".into())),
+            Box::new(GalatJembatan::BatasKeputusanDuaMasukan),
+            Box::new(GalatJembatan::ResolusiDiLuarRentang {
+                min: 2,
+                max: 400,
+                diberi: 1,
+            }),
+            Box::new(GalatJembatan::RentangTakSah { min: 1.0, max: 0.0 }),
+        ];
+        for g in &semua {
+            assert!(
+                KODE_JEMBATAN
+                    .iter()
+                    .any(|(k, n)| *k == g.kode() && *n == g.argumen().len()),
+                "kode tidak terdaftar atau jumlah argumennya berbeda: {} ({} argumen)",
+                g.kode(),
+                g.argumen().len()
+            );
+        }
+        // Dan sebaliknya: kode yang tidak dipakai varian mana pun adalah
+        // terjemahan yang dirawat tanpa satu pun galat yang menghasilkannya.
+        let dipakai: Vec<&str> = semua.iter().map(|g| g.kode()).collect();
+        for (kode, _) in KODE_JEMBATAN {
+            assert!(
+                dipakai.contains(kode),
+                "kode tidak dipakai siapa pun: {kode}"
+            );
+        }
+    }
+
+    #[test]
+    fn daftar_kode_memuat_kedua_sumbernya() {
+        // Sisi antarmuka menuntut kelengkapan terjemahan dari daftar ini, jadi
+        // daftar yang kehilangan satu sumbernya akan membuat separuh kodenya
+        // lolos tanpa terjemahan.
+        let d = error_codes();
+        assert!(d.contains("cf.daftar_kosong"), "{d}");
+        assert!(d.contains("mesin.json_tak_sah"), "{d}");
+        let balik: serde_json::Value = serde_json::from_str(&d).unwrap();
+        let banyak = balik["ok"].as_array().unwrap().len();
+        assert_eq!(
+            banyak,
+            ai_core::galat::KODE.len() + KODE_JEMBATAN.len(),
+            "jumlah kode tidak sepadan"
+        );
+    }
+
+    #[test]
+    fn kode_jembatan_tidak_bertabrakan_dengan_pustaka_inti() {
+        for (kode, _) in KODE_JEMBATAN {
+            assert!(
+                !ai_core::galat::KODE.iter().any(|(k, _)| k == kode),
+                "kode kembar di dua daftar: {kode}"
+            );
+        }
+    }
+
+    #[test]
+    fn galat_penguraian_membawa_kode_bukan_kalimat() {
+        // Jalan yang paling sering dilalui: masukan yang bukan JSON sah.
+        let g = cf_from_mb_md(f64::NAN, 0.0);
+        assert!(g.contains(r#""kode""#), "{g}");
+        let h = cf_premise("bukan json", "AND");
+        assert!(h.contains(r#""kode":"mesin.json_tak_sah""#), "{h}");
     }
 
     #[test]

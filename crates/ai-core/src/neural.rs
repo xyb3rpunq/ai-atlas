@@ -48,6 +48,36 @@ pub enum NeuralError {
     },
 }
 
+impl crate::galat::Dijelaskan for NeuralError {
+    fn kode(&self) -> &'static str {
+        match self {
+            NeuralError::BadArchitecture(_) => "syaraf.arsitektur_tak_sah",
+            NeuralError::InputSizeMismatch { .. } => "syaraf.masukan_tak_sepadan",
+            NeuralError::TargetSizeMismatch { .. } => "syaraf.target_tak_sepadan",
+            NeuralError::DatasetMismatch { .. } => "syaraf.data_tak_sepadan",
+            NeuralError::EmptyDataset => "syaraf.data_kosong",
+            NeuralError::BadLearningRate(_) => "syaraf.laju_belajar",
+            NeuralError::Diverged { .. } => "syaraf.menyimpang",
+        }
+    }
+
+    fn argumen(&self) -> Vec<String> {
+        match self {
+            NeuralError::BadArchitecture(s) => vec![s.clone()],
+            NeuralError::InputSizeMismatch { expected, got }
+            | NeuralError::TargetSizeMismatch { expected, got } => {
+                vec![expected.to_string(), got.to_string()]
+            }
+            NeuralError::DatasetMismatch { inputs, targets } => {
+                vec![inputs.to_string(), targets.to_string()]
+            }
+            NeuralError::EmptyDataset => Vec::new(),
+            NeuralError::BadLearningRate(v) => vec![v.to_string()],
+            NeuralError::Diverged { epoch } => vec![epoch.to_string()],
+        }
+    }
+}
+
 impl core::fmt::Display for NeuralError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {

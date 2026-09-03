@@ -14,11 +14,17 @@
 
 import init, * as wasm from "../pkg/ai_wasm.js";
 import wasmUrl from "../pkg/ai_wasm_bg.wasm?url";
-import { bi, pick } from "./i18n.js";
+import { bacaGalat, kalimatGalat } from "./galat.js";
 import type { Lang } from "./i18n.js";
 
-/** Amplop hasil dari sisi Rust. */
-type Envelope<T> = { ok: T } | { err: string };
+/**
+ * Amplop hasil dari sisi Rust.
+ *
+ * Sisi galatnya berupa kode dan nilai, bukan kalimat — lihat `galat.ts`.
+ * Ditulis `unknown` di sini, bukan bentuk pastinya, supaya bentuk yang tak
+ * terduga tetap ditangani alih-alih dipercaya begitu saja.
+ */
+type Envelope<T> = { ok: T } | { err: unknown };
 
 /** Kegagalan yang berasal dari mesin, dibedakan dari galat pemrograman biasa. */
 export class EngineError extends Error {
@@ -41,21 +47,32 @@ export function load(): Promise<void> {
   return ready;
 }
 
-/** Membongkar amplop JSON, melempar {@link EngineError} bila berisi galat. */
+/**
+ * Membongkar amplop JSON, melempar {@link EngineError} bila berisi galat.
+ *
+ * Mesin menyerahkan **kode dan nilai**, bukan kalimat: `{"err": {"kode":
+ * "cf.daftar_kosong", "arg": []}}`. Kalimatnya dirakit di `galat.ts`, dalam
+ * bahasa pembacanya. Alasannya ada di kepala berkas itu.
+ */
 function unwrap<T>(raw: string): T {
   let parsed: Envelope<T>;
   try {
     parsed = JSON.parse(raw) as Envelope<T>;
   } catch {
-    // Dwibahasa seperti teks lain, meski jarang terlihat: kalau ia muncul,
-    // yang membacanya sedang mengalami kegagalan — dan pesan kegagalan dalam
-    // bahasa asing adalah yang paling buruk untuk dibaca.
+    // Kegagalan di sini berarti mesin mengembalikan sesuatu yang bahkan bukan
+    // JSON. Ia tidak punya kode karena ia tidak pernah sampai ke pembungkus
+    // amplopnya, jadi kodenya dipasang di sini.
     throw new EngineError(
-      `${pick(bi("mesin mengembalikan JSON tidak sah", "the engine returned invalid JSON"))}: ` +
-        raw.slice(0, 120),
+      kalimatGalat({ kode: "mesin.json_tak_sah", arg: [raw.slice(0, 120)] }),
     );
   }
-  if ("err" in parsed) throw new EngineError(parsed.err);
+  if ("err" in parsed) {
+    const galat = bacaGalat(parsed.err);
+    if (galat !== null) throw new EngineError(kalimatGalat(galat));
+    // Bentuk yang tidak dikenal tetap dilaporkan apa adanya; kegagalan yang
+    // tampil sebagai ruang kosong tidak bisa ditelusuri siapa pun.
+    throw new EngineError(String(parsed.err));
+  }
   return parsed.ok;
 }
 
@@ -102,6 +119,18 @@ export interface SessionInfo {
   module: string;
   title_id: string;
   title_en: string;
+}
+
+/**
+ * Seluruh kode galat yang bisa datang dari mesin, beserta jumlah argumennya.
+ *
+ * Dipakai uji untuk menuntut kelengkapan terjemahannya. Tanpa daftar yang bisa
+ * dibaca, satu-satunya cara mengetahui ada kode yang belum diterjemahkan
+ * adalah menemuinya — dan yang menemuinya adalah pengguna yang sedang
+ * mengalami kegagalan.
+ */
+export function errorCodes(): { kode: string; argumen: number }[] {
+  return unwrap<{ kode: string; argumen: number }[]>(wasm.error_codes());
 }
 
 /** Versi pustaka inti Rust. */

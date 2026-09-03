@@ -32,6 +32,24 @@ pub enum NlpError {
     BadNgramSize(usize),
 }
 
+impl crate::galat::Dijelaskan for NlpError {
+    fn kode(&self) -> &'static str {
+        match self {
+            NlpError::EmptyCorpus => "bahasa.korpus_kosong",
+            NlpError::LengthMismatch { .. } => "bahasa.panjang_tak_sepadan",
+            NlpError::BadNgramSize(_) => "bahasa.ukuran_ngram",
+        }
+    }
+
+    fn argumen(&self) -> Vec<String> {
+        match self {
+            NlpError::EmptyCorpus => Vec::new(),
+            NlpError::LengthMismatch { a, b } => vec![a.to_string(), b.to_string()],
+            NlpError::BadNgramSize(n) => vec![n.to_string()],
+        }
+    }
+}
+
 impl core::fmt::Display for NlpError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {

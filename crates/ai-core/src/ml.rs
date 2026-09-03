@@ -64,6 +64,39 @@ pub enum MlError {
     },
 }
 
+impl crate::galat::Dijelaskan for MlError {
+    fn kode(&self) -> &'static str {
+        match self {
+            MlError::EmptyDataset => "ml.data_kosong",
+            MlError::LengthMismatch { .. } => "ml.panjang_tak_sepadan",
+            MlError::RaggedRows { .. } => "ml.baris_tak_rata",
+            MlError::BadParameter { .. } => "ml.parameter_tak_sah",
+            MlError::NotTrained => "ml.belum_dilatih",
+            MlError::TooManyClusters { .. } => "ml.kelompok_terlalu_banyak",
+            MlError::NonFiniteValue { .. } => "ml.nilai_bukan_bilangan",
+        }
+    }
+
+    fn argumen(&self) -> Vec<String> {
+        match self {
+            MlError::EmptyDataset | MlError::NotTrained => Vec::new(),
+            MlError::LengthMismatch { features, labels } => {
+                vec![features.to_string(), labels.to_string()]
+            }
+            MlError::RaggedRows { expected, got } => {
+                vec![expected.to_string(), got.to_string()]
+            }
+            MlError::BadParameter { name, value } => vec![name.clone(), value.to_string()],
+            MlError::TooManyClusters { k, points } => {
+                vec![k.to_string(), points.to_string()]
+            }
+            MlError::NonFiniteValue { row, column } => {
+                vec![row.to_string(), column.to_string()]
+            }
+        }
+    }
+}
+
 impl core::fmt::Display for MlError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {

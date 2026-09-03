@@ -7,14 +7,25 @@ penomoran mengikuti [Semantic Versioning](https://semver.org/lang/id/).
 
 ## [Belum dirilis]
 
-### Yang belum tertutup
-- **59 pesan galat di sisi Rust masih berbahasa Indonesia.** Semuanya pesan
-  penolakan masukan — rentang yang salah, larik yang tak sepadan, pembagian
-  dengan nol — dan seluruhnya sampai ke pengguna lewat `errorNote`. Antarmukanya
-  sudah menjaga sebagian besar jalan menuju ke sana (penggeser dibatasi,
-  masukan diperiksa), tetapi tidak seluruhnya. Menutupnya menuntut galatnya
-  membawa jenis dan parameter alih-alih kalimat jadi — persis perlakuan yang
-  baru diterapkan pada kalimat aturan — dan itu pekerjaan tersendiri.
+### Diubah
+- **Galat mesin membawa kode dan nilai, bukan kalimat.** Seluruh 69 pesan galat
+  di pustaka inti dan 11 di jembatan WebAssembly dulu berupa kalimat Bahasa
+  Indonesia yang dirakit di Rust, dan sampai ke pengguna apa adanya — termasuk
+  di halaman yang seluruh sisanya berbahasa Inggris. Sisi antarmuka tidak punya
+  cara memperbaikinya: yang ia terima sudah berupa kalimat jadi.
+
+  Sekarang amplopnya berbunyi `{"err": {"kode": "cf.daftar_kosong", "arg": []}}`
+  dan kalimatnya dirakit di `web/src/galat.ts`, dalam bahasa pembacanya.
+  `Display` di sisi Rust tetap ada dan tetap berbahasa Indonesia — pembacanya
+  pengembang yang sedang menatap kegagalan uji, dan pesan uji yang berbunyi
+  "cari.awal_terhalang" jauh lebih sulit dibaca daripada kalimatnya.
+- Tiga galat yang menyimpan kalimat Indonesia di dalam **nilainya** dipecah
+  menjadi varian tersendiri: sebab teko air yang tak terjangkau, sebab
+  kegagalan penguraian rumus, dan ujung pencarian yang terhalang. Untai
+  penjelasan di dalam sebuah galat hanya bisa punya satu bahasa.
+- Penandanya bernomor (`%1`, `%2`), bukan berurutan. Urutan kata berbeda
+  antarbahasa: "diberi %2, harus 1 sampai %1" dan "must be 1 to %1, got %2"
+  menyisipkan nilai yang sama di tempat yang berbeda.
 
 ### Diubah
 - **Kalimat aturan tidak lagi dirakit di mesinnya.** `RuleTrace` kabur dan
@@ -66,6 +77,11 @@ penomoran mengikuti [Semantic Versioning](https://semver.org/lang/id/).
   atribut yang dibaca manusia. Mesin WebAssembly-nya benar-benar dijalankan,
   karena sebagian besar teks laboratorium baru muncul sesudah ada hasil, dan
   halaman yang hampir kosong lolos setiap pemeriksaan bocoran.
+- `error_codes()` di jembatan WebAssembly: seluruh kode galat yang bisa datang
+  dari mesin beserta jumlah argumennya. Uji sisi antarmuka menuntut kamusnya
+  memuat tepat kode-kode itu, dengan jumlah penanda yang sepadan — sehingga
+  kode baru yang belum diterjemahkan gagal di CI, bukan ditemukan pengguna yang
+  sedang mengalami kegagalan.
 - **Uji yang membaca kode antarmukanya sendiri** dan menolak untai berbahasa
   Indonesia yang tidak menjadi argumen pertama sebuah `bi(...)`. Ia menutup
   celah yang tidak bisa dilihat uji lain: `render.test.ts` memasang tiap

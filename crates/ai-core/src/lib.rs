@@ -45,6 +45,7 @@ pub mod eliza;
 pub mod expert;
 pub mod fuzzy;
 pub mod fx;
+pub mod galat;
 pub mod knowledge;
 pub mod ml;
 pub mod neural;

@@ -14,13 +14,35 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Sebab sebuah rumus gagal diuraikan.
+///
+/// Sebuah nilai, bukan untai penjelasan. Untai itu dulu berisi kalimat Bahasa
+/// Indonesia — "kurung tutup hilang", "rumus kosong" — dan kalimat yang
+/// disimpan di dalam galat hanya bisa punya satu bahasa. Sebabnya dipilah di
+/// sini; kalimatnya dirakit sisi antarmuka.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ParseCause {
+    /// Rumusnya kosong.
+    EmptyFormula,
+    /// Ada karakter yang bukan bagian tata bahasanya.
+    UnknownCharacter(char),
+    /// Kurung buka tidak punya penutup.
+    MissingCloseParen,
+    /// Operator muncul tanpa operand.
+    OperatorWithoutOperand,
+    /// Rumus berakhir lebih cepat daripada yang dituntut tata bahasanya.
+    UnexpectedEnd,
+    /// Rumusnya sudah lengkap tetapi masih ada sisa masukan.
+    TrailingInput,
+}
+
 /// Kesalahan pada representasi pengetahuan.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum KnowledgeError {
     /// Rumus tidak bisa diuraikan.
     ParseError {
-        /// Penjelasan kesalahan.
-        message: String,
+        /// Sebab kegagalannya.
+        cause: ParseCause,
         /// Posisi karakter tempat kesalahan terdeteksi.
         position: usize,
     },
@@ -34,11 +56,65 @@ pub enum KnowledgeError {
     ProofLimitExceeded(usize),
 }
 
+impl crate::galat::Dijelaskan for KnowledgeError {
+    fn kode(&self) -> &'static str {
+        match self {
+            KnowledgeError::ParseError { cause, .. } => match cause {
+                ParseCause::EmptyFormula => "logika.urai_rumus_kosong",
+                ParseCause::UnknownCharacter(_) => "logika.urai_karakter_tak_dikenal",
+                ParseCause::MissingCloseParen => "logika.urai_kurung_tutup_hilang",
+                ParseCause::OperatorWithoutOperand => "logika.urai_operator_tanpa_operand",
+                ParseCause::UnexpectedEnd => "logika.urai_rumus_terputus",
+                ParseCause::TrailingInput => "logika.urai_sisa_masukan",
+            },
+            KnowledgeError::TooManyVariables(_) => "logika.terlalu_banyak_variabel",
+            KnowledgeError::EmptyKnowledgeBase => "logika.basis_kosong",
+            KnowledgeError::UnknownNode(_) => "logika.simpul_tak_dikenal",
+            KnowledgeError::ProofLimitExceeded(_) => "logika.batas_pembuktian",
+        }
+    }
+
+    fn argumen(&self) -> Vec<String> {
+        match self {
+            // Posisi selalu argumen pertama, supaya seluruh galat penguraian
+            // punya bentuk yang sama; karakternya menyusul bila ada.
+            KnowledgeError::ParseError { cause, position } => match cause {
+                ParseCause::UnknownCharacter(c) => vec![position.to_string(), c.to_string()],
+                // Rumus kosong selalu gagal di posisi nol, jadi menyebut
+                // posisinya hanya menambah angka yang tidak menjelaskan apa
+                // pun. Jumlah argumen dan jumlah penanda dituntut sepadan,
+                // sehingga argumen yang tidak dipakai bukan sekadar mubazir —
+                // ia membuat ujinya gagal.
+                ParseCause::EmptyFormula => Vec::new(),
+                _ => vec![position.to_string()],
+            },
+            KnowledgeError::TooManyVariables(n) => {
+                vec![n.to_string(), MAX_VARIABLES.to_string()]
+            }
+            KnowledgeError::EmptyKnowledgeBase => Vec::new(),
+            KnowledgeError::UnknownNode(n) => vec![n.clone()],
+            KnowledgeError::ProofLimitExceeded(n) => vec![n.to_string()],
+        }
+    }
+}
+
 impl core::fmt::Display for KnowledgeError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            KnowledgeError::ParseError { message, position } => {
-                write!(f, "gagal menguraikan pada posisi {position}: {message}")
+            KnowledgeError::ParseError { cause, position } => {
+                let sebab = match cause {
+                    ParseCause::EmptyFormula => "rumus kosong".to_string(),
+                    ParseCause::UnknownCharacter(c) => format!("karakter tak dikenal: {c:?}"),
+                    ParseCause::MissingCloseParen => "kurung tutup hilang".to_string(),
+                    ParseCause::OperatorWithoutOperand => {
+                        "operator muncul tanpa operand".to_string()
+                    }
+                    ParseCause::UnexpectedEnd => {
+                        "rumus berakhir lebih cepat dari yang diharapkan".to_string()
+                    }
+                    ParseCause::TrailingInput => "ada sisa masukan yang tidak terpakai".to_string(),
+                };
+                write!(f, "gagal menguraikan pada posisi {position}: {sebab}")
             }
             KnowledgeError::TooManyVariables(n) => write!(
                 f,
@@ -251,7 +327,7 @@ pub fn parse(input: &str) -> Result<Formula, KnowledgeError> {
     let formula = parser.parse_iff()?;
     if parser.position < parser.tokens.len() {
         return Err(KnowledgeError::ParseError {
-            message: "ada sisa masukan yang tidak terpakai".into(),
+            cause: ParseCause::TrailingInput,
             position: parser.position,
         });
     }
@@ -352,7 +428,7 @@ fn lex(input: &str) -> Result<Vec<Token>, KnowledgeError> {
             }
             other => {
                 return Err(KnowledgeError::ParseError {
-                    message: format!("karakter tak dikenal: {other:?}"),
+                    cause: ParseCause::UnknownCharacter(other),
                     position: i,
                 })
             }
@@ -360,7 +436,7 @@ fn lex(input: &str) -> Result<Vec<Token>, KnowledgeError> {
     }
     if out.is_empty() {
         return Err(KnowledgeError::ParseError {
-            message: "rumus kosong".into(),
+            cause: ParseCause::EmptyFormula,
             position: 0,
         });
     }
@@ -377,9 +453,9 @@ impl Parser {
         self.tokens.get(self.position)
     }
 
-    fn error(&self, message: &str) -> KnowledgeError {
+    fn error(&self, cause: ParseCause) -> KnowledgeError {
         KnowledgeError::ParseError {
-            message: message.to_string(),
+            cause,
             position: self.position,
         }
     }
@@ -437,7 +513,7 @@ impl Parser {
                 self.position += 1;
                 let inner = self.parse_iff()?;
                 if self.peek() != Some(&Token::Close) {
-                    return Err(self.error("kurung tutup hilang"));
+                    return Err(self.error(ParseCause::MissingCloseParen));
                 }
                 self.position += 1;
                 Ok(inner)
@@ -446,8 +522,8 @@ impl Parser {
                 self.position += 1;
                 Ok(Formula::atom(name))
             }
-            Some(_) => Err(self.error("operator muncul tanpa operand")),
-            None => Err(self.error("rumus berakhir lebih cepat dari yang diharapkan")),
+            Some(_) => Err(self.error(ParseCause::OperatorWithoutOperand)),
+            None => Err(self.error(ParseCause::UnexpectedEnd)),
         }
     }
 }
@@ -1492,8 +1568,28 @@ mod tests {
     fn pesan_error_terbaca() {
         for e in [
             KnowledgeError::ParseError {
-                message: "x".into(),
+                cause: ParseCause::EmptyFormula,
                 position: 1,
+            },
+            KnowledgeError::ParseError {
+                cause: ParseCause::UnknownCharacter('%'),
+                position: 2,
+            },
+            KnowledgeError::ParseError {
+                cause: ParseCause::MissingCloseParen,
+                position: 3,
+            },
+            KnowledgeError::ParseError {
+                cause: ParseCause::OperatorWithoutOperand,
+                position: 4,
+            },
+            KnowledgeError::ParseError {
+                cause: ParseCause::UnexpectedEnd,
+                position: 5,
+            },
+            KnowledgeError::ParseError {
+                cause: ParseCause::TrailingInput,
+                position: 6,
             },
             KnowledgeError::TooManyVariables(30),
             KnowledgeError::EmptyKnowledgeBase,

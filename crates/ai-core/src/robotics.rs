@@ -37,6 +37,34 @@ pub enum RoboticsError {
     },
 }
 
+impl crate::galat::Dijelaskan for RoboticsError {
+    fn kode(&self) -> &'static str {
+        match self {
+            RoboticsError::BadParameter { .. } => "robot.parameter_tak_sah",
+            RoboticsError::OutOfReach { .. } => "robot.di_luar_jangkauan",
+            RoboticsError::DidNotConverge { .. } => "robot.tidak_konvergen",
+        }
+    }
+
+    fn argumen(&self) -> Vec<String> {
+        match self {
+            RoboticsError::BadParameter { name, value } => {
+                vec![name.clone(), value.to_string()]
+            }
+            RoboticsError::OutOfReach {
+                distance,
+                max_reach,
+                min_reach,
+            } => vec![
+                format!("{distance:.3}"),
+                format!("{min_reach:.3}"),
+                format!("{max_reach:.3}"),
+            ],
+            RoboticsError::DidNotConverge { steps } => vec![steps.to_string()],
+        }
+    }
+}
+
 impl core::fmt::Display for RoboticsError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {

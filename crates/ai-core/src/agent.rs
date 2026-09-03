@@ -37,14 +37,65 @@ pub enum AgentError {
         b: usize,
     },
     /// Sasaran mustahil dicapai dengan kapasitas yang ada.
-    UnreachableTarget {
+    TargetExceedsLargestJug {
         /// Sasaran yang diminta.
         target: usize,
-        /// Alasan singkat.
-        reason: String,
+        /// Kapasitas teko terbesar.
+        largest: usize,
     },
+    /// Sasaran bukan kelipatan pembagi bersama terbesar kedua teko.
+    ///
+    /// Dipisah dari {@link AgentError::TargetExceedsLargestJug} alih-alih
+    /// dibedakan lewat untai `reason`. Untai itu dulu berisi kalimat Bahasa
+    /// Indonesia, dan kalimat yang disimpan di dalam galat hanya bisa punya
+    /// satu bahasa.
+    TargetNotMultipleOfGcd {
+        /// Sasaran yang diminta.
+        target: usize,
+        /// Pembagi bersama terbesar kedua kapasitas.
+        gcd: usize,
+    },
+    /// Seluruh ruang keadaan sudah ditelusuri tanpa menemukan sasaran.
+    ///
+    /// Tidak seharusnya tercapai: keterjangkauan sudah diperiksa di muka.
+    SearchExhausted,
+    /// Tidak ada urutan penyeberangan yang aman untuk rombongan itu.
+    NoSafeCrossing,
     /// Jumlah misionaris atau kanibal di luar batas.
     BadPartySize(usize),
+}
+
+impl crate::galat::Dijelaskan for AgentError {
+    fn kode(&self) -> &'static str {
+        match self {
+            AgentError::BadRoomCount(_) => "agen.jumlah_ruangan",
+            AgentError::StartOutOfRange { .. } => "agen.posisi_awal",
+            AgentError::BadCapacity { .. } => "agen.kapasitas_teko",
+            AgentError::TargetExceedsLargestJug { .. } => "agen.sasaran_melebihi_teko",
+            AgentError::TargetNotMultipleOfGcd { .. } => "agen.sasaran_bukan_kelipatan",
+            AgentError::SearchExhausted => "agen.ruang_keadaan_habis",
+            AgentError::NoSafeCrossing => "agen.penyeberangan_tak_aman",
+            AgentError::BadPartySize(_) => "agen.jumlah_rombongan",
+        }
+    }
+
+    fn argumen(&self) -> Vec<String> {
+        match self {
+            AgentError::BadRoomCount(n) => vec![MAX_ROOMS.to_string(), n.to_string()],
+            AgentError::StartOutOfRange { position, rooms } => {
+                vec![position.to_string(), rooms.to_string()]
+            }
+            AgentError::BadCapacity { a, b } => vec![a.to_string(), b.to_string()],
+            AgentError::TargetExceedsLargestJug { target, largest } => {
+                vec![target.to_string(), largest.to_string()]
+            }
+            AgentError::TargetNotMultipleOfGcd { target, gcd } => {
+                vec![target.to_string(), gcd.to_string()]
+            }
+            AgentError::SearchExhausted | AgentError::NoSafeCrossing => Vec::new(),
+            AgentError::BadPartySize(n) => vec![MAX_PARTY.to_string(), n.to_string()],
+        }
+    }
 }
 
 impl core::fmt::Display for AgentError {
@@ -59,8 +110,18 @@ impl core::fmt::Display for AgentError {
             AgentError::BadCapacity { a, b } => {
                 write!(f, "kapasitas teko tidak sah: {a} dan {b}")
             }
-            AgentError::UnreachableTarget { target, reason } => {
-                write!(f, "sasaran {target} tidak mungkin dicapai: {reason}")
+            AgentError::TargetExceedsLargestJug { target, largest } => {
+                write!(f, "sasaran {target} melebihi teko terbesar ({largest})")
+            }
+            AgentError::TargetNotMultipleOfGcd { target, gcd } => {
+                write!(
+                    f,
+                    "sasaran {target} bukan kelipatan pembagi bersama terbesar ({gcd})"
+                )
+            }
+            AgentError::SearchExhausted => write!(f, "ruang keadaan habis ditelusuri"),
+            AgentError::NoSafeCrossing => {
+                write!(f, "tidak ada urutan penyeberangan yang aman")
             }
             AgentError::BadPartySize(n) => {
                 write!(f, "jumlah rombongan harus 1 sampai {MAX_PARTY}, diberi {n}")
@@ -461,17 +522,14 @@ pub fn solve_water_jug(
         });
     }
     if target > capacity_a.max(capacity_b) {
-        return Err(AgentError::UnreachableTarget {
+        return Err(AgentError::TargetExceedsLargestJug {
             target,
-            reason: format!("melebihi teko terbesar ({})", capacity_a.max(capacity_b)),
+            largest: capacity_a.max(capacity_b),
         });
     }
     let d = gcd(capacity_a, capacity_b);
     if target % d != 0 {
-        return Err(AgentError::UnreachableTarget {
-            target,
-            reason: format!("bukan kelipatan pembagi bersama terbesar ({d})"),
-        });
+        return Err(AgentError::TargetNotMultipleOfGcd { target, gcd: d });
     }
 
     let start: JugState = (0, 0);
@@ -529,10 +587,7 @@ pub fn solve_water_jug(
     }
 
     // Tidak seharusnya tercapai karena keterjangkauan sudah diperiksa di muka.
-    Err(AgentError::UnreachableTarget {
-        target,
-        reason: "ruang keadaan habis ditelusuri".to_string(),
-    })
+    Err(AgentError::SearchExhausted)
 }
 
 // ---------------------------------------------------------------------------
@@ -649,10 +704,7 @@ pub fn solve_missionaries(
         }
     }
 
-    Err(AgentError::UnreachableTarget {
-        target: 0,
-        reason: "tidak ada urutan penyeberangan yang aman".to_string(),
-    })
+    Err(AgentError::NoSafeCrossing)
 }
 
 #[cfg(test)]
@@ -904,15 +956,20 @@ mod tests {
 
     #[test]
     fn teko_air_menolak_sasaran_mustahil() {
-        // Dengan teko genap, sasaran ganjil mustahil dicapai.
+        // Dengan teko genap, sasaran ganjil mustahil dicapai. Sebabnya
+        // dibedakan, bukan disatukan: keduanya mustahil karena alasan yang
+        // berbeda, dan yang membacanya berhak tahu yang mana.
         assert!(matches!(
             solve_water_jug(2, 4, 3),
-            Err(AgentError::UnreachableTarget { .. })
+            Err(AgentError::TargetNotMultipleOfGcd { target: 3, gcd: 2 })
         ));
         // Melebihi teko terbesar juga mustahil.
         assert!(matches!(
             solve_water_jug(3, 5, 9),
-            Err(AgentError::UnreachableTarget { .. })
+            Err(AgentError::TargetExceedsLargestJug {
+                target: 9,
+                largest: 5
+            })
         ));
     }
 
@@ -994,7 +1051,7 @@ mod tests {
         // Empat banding empat dengan perahu dua tidak punya solusi aman.
         assert!(matches!(
             solve_missionaries(4, 4, 2),
-            Err(AgentError::UnreachableTarget { .. })
+            Err(AgentError::NoSafeCrossing)
         ));
     }
 
@@ -1039,10 +1096,13 @@ mod tests {
                 rooms: 2,
             },
             AgentError::BadCapacity { a: 0, b: 5 },
-            AgentError::UnreachableTarget {
+            AgentError::TargetExceedsLargestJug {
                 target: 3,
-                reason: "x".into(),
+                largest: 2,
             },
+            AgentError::TargetNotMultipleOfGcd { target: 3, gcd: 2 },
+            AgentError::SearchExhausted,
+            AgentError::NoSafeCrossing,
             AgentError::BadPartySize(0),
         ] {
             assert!(!e.to_string().is_empty());

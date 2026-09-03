@@ -39,6 +39,34 @@ pub enum BayesError {
     NotTrained,
 }
 
+impl crate::galat::Dijelaskan for BayesError {
+    fn kode(&self) -> &'static str {
+        match self {
+            BayesError::ProbabilityOutOfRange(_) => "bayes.probabilitas_di_luar_rentang",
+            BayesError::ZeroEvidence => "bayes.bukti_nol",
+            BayesError::LengthMismatch { .. } => "bayes.panjang_tak_sepadan",
+            BayesError::EmptyInput => "bayes.masukan_kosong",
+            BayesError::PriorsDoNotSumToOne(_) => "bayes.prior_tak_berjumlah_satu",
+            BayesError::IndexOutOfRange { .. } => "bayes.indeks_di_luar_jangkauan",
+            BayesError::NotTrained => "bayes.belum_dilatih",
+        }
+    }
+
+    fn argumen(&self) -> Vec<String> {
+        match self {
+            BayesError::ProbabilityOutOfRange(v) => vec![v.clone()],
+            BayesError::PriorsDoNotSumToOne(v) => vec![v.to_string()],
+            BayesError::LengthMismatch { a, b } => vec![a.to_string(), b.to_string()],
+            BayesError::IndexOutOfRange { index, len } => {
+                vec![index.to_string(), len.to_string()]
+            }
+            BayesError::ZeroEvidence | BayesError::EmptyInput | BayesError::NotTrained => {
+                Vec::new()
+            }
+        }
+    }
+}
+
 impl core::fmt::Display for BayesError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
