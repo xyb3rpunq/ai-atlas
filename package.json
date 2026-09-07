@@ -18,8 +18,8 @@
     "sitemap": "node scripts/sitemap.mjs"
   },
   "devDependencies": {
-    "@types/node": "^26.4.0",
-    "happy-dom": "^20.12.0",
+    "@types/node": "^26.4.1",
+    "happy-dom": "^20.14.0",
     "typescript": "^5.9.2",
     "vite": "^7.1.3",
     "vitest": "^3.2.4"
