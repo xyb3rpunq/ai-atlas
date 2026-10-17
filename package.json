@@ -21,7 +21,7 @@
     "@types/node": "^26.4.0",
     "happy-dom": "^20.12.0",
     "typescript": "^5.9.2",
-    "vite": "^7.1.3",
+    "vite": "^8.2.2",
     "vitest": "^3.2.4"
   },
   "author": "Daniel Hutajulu (.Deckyx)",
